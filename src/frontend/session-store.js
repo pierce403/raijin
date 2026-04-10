@@ -63,6 +63,7 @@ export function deleteSession(sessionId) {
 }
 
 export function buildBootstrapCommand(session, origin) {
+  const userAgent = `raijin-agent/0.1 (+${origin})`;
   const config = {
     baseUrl: origin,
     sessionId: session.sessionId,
@@ -76,7 +77,7 @@ export function buildBootstrapCommand(session, origin) {
 
   const encodedConfig = encodeBase64Url(encoder.encode(JSON.stringify(config)));
   const bootstrapUrl = `${origin}/bootstrap?c=${encodedConfig}`;
-  return `python3 -c "import urllib.request; exec(urllib.request.urlopen('${bootstrapUrl}').read().decode())"`;
+  return `python3 -c "import urllib.request; req = urllib.request.Request('${bootstrapUrl}', headers={'User-Agent': '${userAgent}'}); exec(urllib.request.urlopen(req).read().decode())"`;
 }
 
 export function encodeSessionFragment(session) {

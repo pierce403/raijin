@@ -302,6 +302,7 @@ TOKEN = CONFIG["token"]
 MODE = CONFIG["mode"]
 COMMAND = CONFIG.get("command", "")
 READONLY = bool(CONFIG.get("readonly"))
+USER_AGENT = "raijin-agent/0.1 (+" + BASE_URL + ")"
 HEARTBEAT_INTERVAL = 15
 POLL_TIMEOUT = 30
 RUNNING = True
@@ -310,6 +311,7 @@ MASTER_FD = None
 REQUEST_HEADERS = {
     "Authorization": "Bearer " + TOKEN,
     "Content-Type": "application/json",
+    "User-Agent": USER_AGENT,
 }
 
 def request_json(method, path, payload=None, timeout=POLL_TIMEOUT):
