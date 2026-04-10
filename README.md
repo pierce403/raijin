@@ -94,7 +94,7 @@ This repo is designed for Cloudflare Workers Builds.
 
 ### Important Cloudflare detail
 
-Cloudflare Workers Builds expects the Worker name in the dashboard to match the `name` field in [wrangler.jsonc](/home/pierce/projects/raijin/wrangler.jsonc). This repo uses `raijin-sh`.
+Cloudflare Workers Builds expects the Worker name in the dashboard to match the `name` field in [wrangler.jsonc](/home/pierce/projects/raijin/wrangler.jsonc). This repo uses `raijin`.
 
 ### Custom domain
 
