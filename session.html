@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>raijin.sh session</title>
+    <script type="module" src="/src/frontend/session.js"></script>
+  </head>
+  <body class="page page-session">
+    <main class="session-layout">
+      <section class="session-sidebar">
+        <div class="brand-block">
+          <p class="eyebrow">raijin.sh</p>
+          <h1>Session</h1>
+          <p class="lede compact">
+            Temporary shell bridge for systems you control.
+          </p>
+        </div>
+
+        <div class="warning-banner" role="alert">
+          <strong>Warning:</strong> active shell access is granted to the current
+          environment until the session ends.
+        </div>
+
+        <div class="panel status-panel">
+          <div class="status-row">
+            <span>Status</span>
+            <span id="status-badge" class="status-badge status-waiting">
+              waiting for browser
+            </span>
+          </div>
+          <div class="status-row">
+            <span>Mode</span>
+            <span id="mode-label">interactive</span>
+          </div>
+          <div class="status-row">
+            <span>Session</span>
+            <code id="session-id">...</code>
+          </div>
+        </div>
+
+        <div class="panel command-panel">
+          <header class="panel-header compact">
+            <h2>Bootstrap Command</h2>
+            <p>Run this inside the Linux container or VM you control.</p>
+          </header>
+          <textarea
+            id="bootstrap-command"
+            class="command-output"
+            readonly
+            spellcheck="false"
+          ></textarea>
+          <div class="action-row">
+            <button id="copy-command" class="secondary-button" type="button">
+              Copy Command
+            </button>
+            <button id="end-session" class="danger-button" type="button">
+              End Session
+            </button>
+          </div>
+          <p id="session-error" class="form-error" hidden></p>
+        </div>
+      </section>
+
+      <section class="terminal-shell">
+        <header class="terminal-header">
+          <h2>Terminal</h2>
+          <p id="status-copy">Listening for connection...</p>
+        </header>
+        <div id="terminal" class="terminal-panel" aria-label="Live terminal"></div>
+      </section>
+    </main>
+  </body>
+</html>

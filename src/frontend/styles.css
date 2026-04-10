@@ -1,0 +1,359 @@
+:root {
+  --bg: #090909;
+  --bg-alt: #141414;
+  --panel: rgba(18, 18, 18, 0.92);
+  --panel-strong: rgba(12, 12, 12, 0.98);
+  --border: rgba(255, 145, 36, 0.22);
+  --border-strong: rgba(255, 145, 36, 0.5);
+  --text: #f6f1eb;
+  --text-muted: #ccb8a4;
+  --text-soft: #9f8f80;
+  --orange: #ff8a1f;
+  --orange-bright: #ffab4d;
+  --danger: #ff5a36;
+  --shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(255, 139, 31, 0.18), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(255, 139, 31, 0.12), transparent 32%),
+    linear-gradient(180deg, #060606, #110d09 55%, #060606);
+  color: var(--text);
+}
+
+body {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page {
+  min-height: 100vh;
+}
+
+.shell-layout,
+.session-layout,
+.not-found-layout {
+  width: min(1200px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.shell-layout {
+  display: grid;
+  gap: 24px;
+  align-content: center;
+  min-height: 100vh;
+}
+
+.session-layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.not-found-layout {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.hero-card,
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.hero-card {
+  padding: 32px;
+}
+
+.panel {
+  padding: 24px;
+}
+
+.panel-header h2,
+.terminal-header h2,
+.hero-card h1,
+.brand-block h1,
+.not-found-layout h1 {
+  margin: 0;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.hero-card h1 {
+  max-width: 12ch;
+  font-size: clamp(2.3rem, 6vw, 4.8rem);
+  line-height: 1;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: var(--orange-bright);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.lede {
+  max-width: 60ch;
+  margin: 18px 0 0;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+}
+
+.lede.compact {
+  margin-top: 8px;
+  font-size: 0.98rem;
+}
+
+.warning-banner {
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 90, 54, 0.35);
+  border-radius: 16px;
+  background: rgba(58, 18, 11, 0.75);
+  color: #ffd5cb;
+}
+
+.session-form,
+.mode-group,
+.stack-field,
+.command-panel,
+.status-panel,
+.terminal-shell,
+.session-sidebar {
+  display: grid;
+  gap: 16px;
+}
+
+.mode-group {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.mode-group legend {
+  padding: 0 8px;
+  color: var(--text-muted);
+}
+
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+}
+
+.stack-field span,
+.status-row span:first-child,
+.helper-copy,
+.panel-header p,
+.terminal-header p {
+  color: var(--text-soft);
+}
+
+.stack-field input,
+.command-output {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 14px 16px;
+}
+
+.command-output {
+  min-height: 180px;
+  resize: vertical;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.92rem;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.danger-button:hover,
+.link-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--orange), var(--orange-bright));
+  color: #1e1106;
+  font-weight: 700;
+}
+
+.secondary-button {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.danger-button {
+  background: rgba(255, 90, 54, 0.14);
+  border-color: rgba(255, 90, 54, 0.45);
+  color: #ffd6cf;
+}
+
+.submit-row,
+.action-row,
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.helper-copy {
+  margin: 0;
+  text-align: right;
+}
+
+.session-sidebar {
+  align-content: start;
+}
+
+.terminal-shell {
+  min-height: min(80vh, 860px);
+}
+
+.terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 20px 24px 0;
+}
+
+.terminal-panel {
+  min-height: 0;
+  flex: 1;
+  height: calc(100vh - 120px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 140, 38, 0.06), transparent 25%),
+    #050505;
+  box-shadow: var(--shadow);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  text-transform: lowercase;
+}
+
+.status-waiting {
+  background: rgba(255, 171, 77, 0.14);
+  color: #ffcb91;
+}
+
+.status-connected {
+  background: rgba(70, 198, 126, 0.16);
+  color: #9ff1be;
+}
+
+.status-ended,
+.status-expired,
+.status-disconnected,
+.status-agent {
+  background: rgba(255, 90, 54, 0.14);
+  color: #ffc4ba;
+}
+
+.form-error {
+  margin: 0;
+  color: #ffb3a5;
+}
+
+.xterm {
+  padding: 14px;
+}
+
+@media (max-width: 960px) {
+  .session-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .terminal-panel {
+    height: 60vh;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell-layout,
+  .session-layout,
+  .not-found-layout {
+    width: min(calc(100vw - 20px), 100%);
+    padding-top: 18px;
+  }
+
+  .hero-card,
+  .panel {
+    padding: 20px;
+    border-radius: 18px;
+  }
+
+  .submit-row,
+  .action-row,
+  .status-row,
+  .terminal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .helper-copy {
+    text-align: left;
+  }
+}
