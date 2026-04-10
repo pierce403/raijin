@@ -151,7 +151,17 @@ async function handleRequest(request, env) {
 
 async function serveAssetHtml(env, request, assetPath) {
   const assetRequest = new Request(new URL(assetPath, request.url), request);
-  const response = await env.ASSETS.fetch(assetRequest);
+  let response = await env.ASSETS.fetch(assetRequest);
+
+  if (
+    response.status >= 300
+    && response.status < 400
+    && response.headers.has("location")
+  ) {
+    const redirectedUrl = new URL(response.headers.get("location"), request.url);
+    response = await env.ASSETS.fetch(new Request(redirectedUrl, request));
+  }
+
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(htmlHeaders())) {
     headers.set(key, value);
