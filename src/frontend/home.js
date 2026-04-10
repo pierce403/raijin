@@ -1,5 +1,5 @@
 import "./styles.css";
-import { randomToken, saveSession } from "./session-store.js";
+import { encodeSessionFragment, randomToken, saveSession } from "./session-store.js";
 
 const form = document.querySelector("#new-session-form");
 const commandInput = document.querySelector("#command-input");
@@ -60,7 +60,8 @@ form.addEventListener("submit", async (event) => {
     };
 
     saveSession(session);
-    window.location.assign(`/s/${encodeURIComponent(session.sessionId)}`);
+    const fragment = encodeURIComponent(encodeSessionFragment(session));
+    window.location.assign(`/s/${encodeURIComponent(session.sessionId)}#s=${fragment}`);
   } catch (error) {
     setError(error instanceof Error ? error.message : "Unable to create session.");
     createButton.disabled = false;

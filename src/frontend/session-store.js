@@ -1,7 +1,8 @@
 const STORAGE_PREFIX = "raijin:session:";
 const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
-function encodeBase64Url(bytes) {
+export function encodeBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
@@ -11,6 +12,19 @@ function encodeBase64Url(bytes) {
     .replaceAll("+", "-")
     .replaceAll("/", "_")
     .replace(/=+$/u, "");
+}
+
+export function decodeBase64Url(value) {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  const binary = atob(`${normalized}${padding}`);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
 }
 
 export function randomToken(byteLength = 24) {
@@ -63,4 +77,16 @@ export function buildBootstrapCommand(session, origin) {
   const encodedConfig = encodeBase64Url(encoder.encode(JSON.stringify(config)));
   const bootstrapUrl = `${origin}/bootstrap?c=${encodedConfig}`;
   return `python3 -c "import urllib.request; exec(urllib.request.urlopen('${bootstrapUrl}').read().decode())"`;
+}
+
+export function encodeSessionFragment(session) {
+  return encodeBase64Url(encoder.encode(JSON.stringify(session)));
+}
+
+export function decodeSessionFragment(encoded) {
+  try {
+    return JSON.parse(decoder.decode(decodeBase64Url(encoded)));
+  } catch {
+    return null;
+  }
 }

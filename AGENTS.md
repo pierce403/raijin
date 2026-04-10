@@ -1,54 +1,95 @@
-# Remote Agent Notes
+# AGENTS.md - Instructions for Coding Agents
 
-This project ships a generated remote bootstrap script, not a persistent installed agent.
+## Self-Improvement Directive
 
-## Goals
+Read this file at the start of every task and update it before finishing whenever you learn something that will help future agents.
 
-- zero-install
-- Python 3 stdlib only
-- Linux-first
-- PTY-backed shell
-- no persistence
-- no files written to disk
+Capture:
 
-## Runtime behavior
+- verified build, test, and deploy commands
+- codebase conventions and routing assumptions
+- bugs, regressions, and fixes that were discovered
+- operator preferences and workflow expectations
+- concrete pitfalls to avoid next time
 
-The bootstrap returned from `GET /bootstrap?c=...`:
+Keep updates specific. Prefer exact commands, file paths, and failure modes over generic advice.
 
-1. embeds the session token and base URL
-2. opens a PTY with `pty.fork()`
-3. starts either:
-   - `/bin/sh -li`
-   - `/bin/sh -lc <forced command>`
-4. long-polls `GET /agent/:sessionId/in` for input, resize, and terminate events
-5. POSTs output chunks to `POST /agent/:sessionId/out`
-6. POSTs heartbeats to `POST /agent/:sessionId/heartbeat`
-7. POSTs shutdown state to `POST /agent/:sessionId/close`
+## Collaborator Preferences
 
-## Supported modes
+- Keep the implementation small and boring.
+- Favor end-to-end working paths over abstractions.
+- This repo should be committed and pushed after every completed task unless the user explicitly says not to.
+- Stage only files relevant to the task. Do not silently include unrelated work.
 
-- `interactive`: normal shell input/output
-- `command`: launches `/bin/sh -lc <command>`
-- `readonly`: launches a shell but ignores browser `stdin`
+## Project Overview
 
-## Shutdown conditions
+`raijin.sh` is an ephemeral browser-to-terminal bridge for systems the operator controls.
 
-The bootstrap kills the shell and exits when:
+Current architecture:
 
-- it receives a `terminate` event
-- the browser disconnects
-- the session is explicitly ended
-- the Worker reports an expired session
-- the child shell exits on its own
+- Cloudflare Worker serves static assets and request routing.
+- Durable Object holds only in-memory live session relay state.
+- Browser owns session metadata and stores it in `localStorage`.
+- Browser generates `sessionId`, `browserToken`, and `agentToken`.
+- Remote side is a Python 3 stdlib-only bootstrap fetched from `GET /bootstrap?c=...`.
 
-## Scope
+## Important Files
 
-The bootstrap intentionally does not support:
+- `src/index.js`: Worker routes and Python bootstrap generation.
+- `src/session-do.js`: in-memory session relay and auth checks.
+- `src/frontend/home.js`: creates browser-owned sessions.
+- `src/frontend/session.js`: session page, websocket client, terminal UI.
+- `src/frontend/session-store.js`: localStorage helpers and bootstrap config encoding.
+- `wrangler.jsonc`: Worker config, assets, Durable Object binding, worker-first routes.
 
-- persistence
-- auto-start
-- background install
-- stealth or hidden access
-- Windows in v1
+## Verified Commands
 
-This is an ephemeral troubleshooting/admin bridge for systems the operator already controls.
+```bash
+npm install
+npm run build
+npx wrangler dev --local --port 8787
+npx wrangler deploy --dry-run
+```
+
+## Coding Conventions
+
+- Keep the frontend static-first and dependency-light.
+- Use vanilla HTML/CSS/JS plus `xterm.js`; do not introduce framework complexity without a strong reason.
+- Preserve the black/orange terminal aesthetic.
+- Keep the server boring: relay traffic, enforce session rules, avoid persistence.
+- Prefer explicit status transitions: `waiting_for_browser`, `waiting_for_agent`, `connected`, `expired`, `disconnected`, `ended`, `agent_closed`.
+
+## Known Issues And Solutions
+
+- Browser-owned session metadata is origin-scoped because it lives in `localStorage`.
+  Fix:
+  Pass the newly created session bundle in the URL fragment during navigation, then rehydrate and resave it on the final origin in `src/frontend/session.js`.
+
+- `/bootstrap?c=...` must be included in `assets.run_worker_first` in `wrangler.jsonc`.
+  If only `/bootstrap/*` is listed, the asset handler will intercept the request and return a 404.
+
+- `wrangler dev` may still show unrelated local environment variables from `.dev.vars`.
+  The current app does not require `SESSION_SIGNING_KEY`; ignore that leftover local env unless the config is later cleaned up locally.
+
+## Remote Bootstrap Notes
+
+- The bootstrap uses Python 3 stdlib only.
+- Default interactive shell is `/bin/sh -li`.
+- Forced command mode uses `/bin/sh -lc <command>`.
+- Readonly mode ignores browser `stdin` but still streams terminal output.
+- Agent transport is HTTP long-poll plus POST, not WebSocket.
+
+## Deployment Notes
+
+- GitHub remote is `git@github.com:pierce403/raijin.git`.
+- `main` is the active branch and currently tracks `origin/main`.
+- For this repository, pushing directly to `main` is currently the established path.
+
+## Agent Workflow
+
+1. Read this file first.
+2. Inspect the relevant code paths before editing.
+3. Run the smallest verification that proves the task works.
+4. Update this file if you learned something durable.
+5. Commit with a focused message.
+6. Push the result to `origin`.

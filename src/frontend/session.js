@@ -3,7 +3,14 @@ import "./styles.css";
 
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
-import { buildBootstrapCommand, deleteSession, loadSession, sha256Base64Url } from "./session-store.js";
+import {
+  buildBootstrapCommand,
+  decodeSessionFragment,
+  deleteSession,
+  loadSession,
+  saveSession,
+  sha256Base64Url,
+} from "./session-store.js";
 
 const statusBadge = document.querySelector("#status-badge");
 const statusCopy = document.querySelector("#status-copy");
@@ -108,6 +115,23 @@ function decodeBase64ToBytes(base64) {
 
 function safeWriteLine(text) {
   terminal.writeln(text.replace(/\n/g, "\r\n"));
+}
+
+function loadSessionFromFragment() {
+  const fragmentParams = new URLSearchParams(window.location.hash.slice(1));
+  const encoded = fragmentParams.get("s");
+  if (!encoded) {
+    return null;
+  }
+
+  const candidate = decodeSessionFragment(encoded);
+  if (!candidate || candidate.sessionId !== sessionId) {
+    return null;
+  }
+
+  saveSession(candidate);
+  window.history.replaceState(null, "", window.location.pathname);
+  return candidate;
 }
 
 function sendMessage(message) {
@@ -260,9 +284,9 @@ window.addEventListener("beforeunload", () => {
 
 async function init() {
   try {
-    sessionInfo = loadSession(sessionId);
+    sessionInfo = loadSession(sessionId) || loadSessionFromFragment();
     if (!sessionInfo) {
-      throw new Error("Session metadata is only available in the browser that created it.");
+      throw new Error("Session metadata was not found for this origin.");
     }
 
     sessionIdNode.textContent = sessionInfo.sessionId;
