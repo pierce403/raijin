@@ -13,6 +13,7 @@
       "/bootstrap/*",
       "/connect/*",
       "/agent/*",
+      "/og-preview",
       "/s/*"
     ]
   },

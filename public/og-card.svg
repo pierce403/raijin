@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="raijin.sh social preview">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050505" />
+      <stop offset="55%" stop-color="#140d07" />
+      <stop offset="100%" stop-color="#050505" />
+    </linearGradient>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0d0d" />
+      <stop offset="100%" stop-color="#19120d" />
+    </linearGradient>
+    <linearGradient id="bolt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe08d" />
+      <stop offset="100%" stop-color="#ff8a1f" />
+    </linearGradient>
+    <radialGradient id="glow" cx="70%" cy="28%" r="48%">
+      <stop offset="0%" stop-color="#ffb14d" stop-opacity="0.35" />
+      <stop offset="100%" stop-color="#ffb14d" stop-opacity="0" />
+    </radialGradient>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+  <g opacity="0.22">
+    <path d="M0 92H1200" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 184H1200" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 276H1200" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 368H1200" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 460H1200" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 552H1200" stroke="#ff8a1f" stroke-width="1" />
+  </g>
+
+  <rect
+    x="56"
+    y="48"
+    width="1088"
+    height="534"
+    rx="34"
+    fill="url(#panel)"
+    stroke="#ff8a1f"
+    stroke-opacity="0.45"
+    stroke-width="2"
+  />
+
+  <g transform="translate(94 86)">
+    <text
+      x="0"
+      y="0"
+      fill="#ffbf70"
+      font-family="IBM Plex Mono, SFMono-Regular, monospace"
+      font-size="26"
+      letter-spacing="5"
+    >
+      RAIJIN.SH
+    </text>
+
+    <text
+      x="0"
+      y="126"
+      fill="#fff5ea"
+      font-family="IBM Plex Sans, Segoe UI, sans-serif"
+      font-size="74"
+      font-weight="700"
+    >
+      Browser-owned live shell access
+    </text>
+
+    <text
+      x="0"
+      y="188"
+      fill="#d4c1af"
+      font-family="IBM Plex Sans, Segoe UI, sans-serif"
+      font-size="29"
+    >
+      Start a temporary session, paste one Python command, and connect
+    </text>
+    <text
+      x="0"
+      y="226"
+      fill="#d4c1af"
+      font-family="IBM Plex Sans, Segoe UI, sans-serif"
+      font-size="29"
+    >
+      from any Linux host you control. No daemon. No install residue.
+    </text>
+
+    <g transform="translate(0 292)">
+      <rect x="0" y="0" width="196" height="42" rx="21" fill="#2a1609" stroke="#ff8a1f" />
+      <rect x="214" y="0" width="216" height="42" rx="21" fill="#2a1609" stroke="#ff8a1f" />
+      <rect x="448" y="0" width="196" height="42" rx="21" fill="#2a1609" stroke="#ff8a1f" />
+      <text x="24" y="28" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="19">
+        one-line bootstrap
+      </text>
+      <text x="238" y="28" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="19">
+        in-memory relay only
+      </text>
+      <text x="472" y="28" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="19">
+        browser websocket ui
+      </text>
+    </g>
+  </g>
+
+  <g transform="translate(804 112)">
+    <rect x="0" y="0" width="278" height="406" rx="28" fill="#090909" stroke="#ff8a1f" stroke-width="2" />
+    <rect x="20" y="20" width="238" height="42" rx="16" fill="#1a120c" />
+    <circle cx="42" cy="41" r="6" fill="#ff5a36" />
+    <circle cx="62" cy="41" r="6" fill="#ffbf70" />
+    <circle cx="82" cy="41" r="6" fill="#89d39b" />
+    <text x="116" y="47" fill="#f0dfcd" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+      live session
+    </text>
+    <g transform="translate(28 96)" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="20">
+      <text x="0" y="0" fill="#ffd49d">$ python3 -c ...</text>
+      <text x="0" y="40" fill="#9ff1be">connected</text>
+      <text x="0" y="90" fill="#85ddd8">uname -a</text>
+      <text x="0" y="130" fill="#f6f1eb">Linux raijin 6.8.0 x86_64</text>
+      <text x="0" y="190" fill="#85ddd8">journalctl -n 5</text>
+      <text x="0" y="230" fill="#f6f1eb">[  ok  ] network-online.target</text>
+      <text x="0" y="270" fill="#f6f1eb">[warn ] kubelet restarting pod</text>
+    </g>
+  </g>
+
+  <g transform="translate(688 62)">
+    <path
+      d="M117 0L0 164H80L48 330L196 128H110L117 0Z"
+      fill="url(#bolt)"
+      filter="url(#softGlow)"
+      opacity="0.52"
+    />
+    <path
+      d="M117 0L0 164H80L48 330L196 128H110L117 0Z"
+      fill="url(#bolt)"
+      stroke="#ffe7af"
+      stroke-width="4"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

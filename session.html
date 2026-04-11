@@ -43,10 +43,14 @@
           <div class="fact-card fact-card-traffic">
             <span>Relay</span>
             <div class="traffic-readout">
-              <span id="tx-indicator" class="traffic-indicator">tx</span>
-              <code id="tx-count">0 B</code>
-              <span id="rx-indicator" class="traffic-indicator">rx</span>
-              <code id="rx-count">0 B</code>
+              <span class="traffic-lane">
+                <span id="tx-indicator" class="traffic-indicator">tx</span>
+                <code id="tx-count">0 B</code>
+              </span>
+              <span class="traffic-lane">
+                <span id="rx-indicator" class="traffic-indicator">rx</span>
+                <code id="rx-count">0 B</code>
+              </span>
             </div>
           </div>
         </div>
@@ -61,25 +65,28 @@
         <p id="session-error" class="form-error" hidden></p>
       </section>
 
-      <section id="bootstrap-panel" class="panel bootstrap-panel">
-        <header class="panel-header compact">
-          <h2>Bootstrap Command</h2>
-          <p>Run this inside the Linux container or VM you control.</p>
-        </header>
-        <textarea
-          id="bootstrap-command"
-          class="command-output"
-          readonly
-          spellcheck="false"
-        ></textarea>
-        <div class="action-row">
-          <button id="copy-command" class="secondary-button" type="button">
-            Copy Command
-          </button>
-        </div>
-      </section>
-
       <section class="terminal-stage">
+        <div id="bootstrap-overlay" class="terminal-overlay" aria-hidden="false">
+          <div class="terminal-overlay-card">
+            <p class="eyebrow overlay-eyebrow">Awaiting Agent</p>
+            <h2>Bootstrap Command</h2>
+            <p class="lede compact">
+              Run this inside the Linux container or VM you control. The terminal will
+              take over as soon as the agent connects.
+            </p>
+            <textarea
+              id="bootstrap-command"
+              class="command-output overlay-command-output"
+              readonly
+              spellcheck="false"
+            ></textarea>
+            <div class="action-row">
+              <button id="copy-command" class="secondary-button" type="button">
+                Copy Command
+              </button>
+            </div>
+          </div>
+        </div>
         <div id="terminal" class="terminal-panel" aria-label="Live terminal"></div>
       </section>
     </main>

@@ -17,11 +17,12 @@ const statusCopy = document.querySelector("#status-copy");
 const modeLabel = document.querySelector("#mode-label");
 const sessionIdNode = document.querySelector("#session-id");
 const remoteIpNode = document.querySelector("#remote-ip");
-const bootstrapPanel = document.querySelector("#bootstrap-panel");
+const bootstrapOverlay = document.querySelector("#bootstrap-overlay");
 const bootstrapNode = document.querySelector("#bootstrap-command");
 const copyButton = document.querySelector("#copy-command");
 const endButton = document.querySelector("#end-session");
 const errorNode = document.querySelector("#session-error");
+const terminalStage = document.querySelector(".terminal-stage");
 const terminalContainer = document.querySelector("#terminal");
 const txIndicator = document.querySelector("#tx-indicator");
 const rxIndicator = document.querySelector("#rx-indicator");
@@ -68,9 +69,10 @@ let websocket;
 let sessionInfo;
 let ended = false;
 let inputDisposable;
-let hasConnected = false;
+let currentStatus = "waiting_for_browser";
 let txBytes = 0;
 let rxBytes = 0;
+let flashTimer;
 const trafficTimers = new WeakMap();
 
 function clearLocalSession() {
@@ -147,26 +149,39 @@ function setRemoteIp(remoteIp) {
   remoteIpNode.textContent = remoteIp || "pending";
 }
 
-function updateLayoutForStatus(status) {
-  if (status === "connected") {
-    hasConnected = true;
-  }
-
-  document.body.classList.toggle("session-live", hasConnected);
-
-  if (hasConnected) {
-    bootstrapPanel.hidden = true;
-    window.requestAnimationFrame(() => {
-      fitTerminalAndNotify();
-    });
+function playConnectionFlash() {
+  if (!terminalStage) {
     return;
   }
 
-  bootstrapPanel.hidden = false;
+  terminalStage.classList.remove("connection-strike");
+  void terminalStage.offsetWidth;
+  terminalStage.classList.add("connection-strike");
+  window.clearTimeout(flashTimer);
+  flashTimer = window.setTimeout(() => {
+    terminalStage.classList.remove("connection-strike");
+  }, 720);
+}
+
+function updateLayoutForStatus(status) {
+  const overlayVisible = status === "waiting_for_browser" || status === "waiting_for_agent";
+  const terminalActive = status === "connected";
+
+  document.body.classList.toggle("session-live", terminalActive);
+  bootstrapOverlay.classList.toggle("is-hidden", !overlayVisible);
+  bootstrapOverlay.setAttribute("aria-hidden", String(!overlayVisible));
+
+  if (terminalActive) {
+    window.requestAnimationFrame(() => {
+      fitTerminalAndNotify();
+    });
+  }
 }
 
 function setStatus(status) {
   const normalized = status || "waiting_for_agent";
+  const previousStatus = currentStatus;
+  currentStatus = normalized;
   const label = normalized.replaceAll("_", " ");
   const badgeType = normalized.startsWith("waiting")
     ? "waiting"
@@ -191,6 +206,10 @@ function setStatus(status) {
 
   statusCopy.textContent = copyMap[normalized] || label;
   updateLayoutForStatus(normalized);
+
+  if (previousStatus !== "connected" && normalized === "connected") {
+    playConnectionFlash();
+  }
 }
 
 function decodeBase64ToBytes(base64) {

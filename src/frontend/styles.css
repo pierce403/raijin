@@ -54,6 +54,7 @@ a {
 .shell-layout,
 .session-layout,
 .session-screen,
+.og-preview-layout,
 .not-found-layout {
   width: min(1200px, calc(100vw - 32px));
   margin: 0 auto;
@@ -91,6 +92,13 @@ a {
   min-height: 100vh;
 }
 
+.og-preview-layout {
+  display: grid;
+  place-items: center;
+  width: min(1320px, calc(100vw - 32px));
+  min-height: 100vh;
+}
+
 .hero-card,
 .panel {
   background: var(--panel);
@@ -108,9 +116,16 @@ a {
   padding: 24px;
 }
 
+.og-preview-panel {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+}
+
 .panel-header h2,
 .terminal-header h2,
 .hero-card h1,
+.og-preview-panel h1,
 .brand-block h1,
 .not-found-layout h1 {
   margin: 0;
@@ -174,7 +189,6 @@ a {
 .terminal-shell,
 .session-sidebar,
 .session-topbar,
-.bootstrap-panel,
 .terminal-stage {
   display: grid;
   gap: 16px;
@@ -222,6 +236,16 @@ a {
   resize: vertical;
   font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
   font-size: 0.92rem;
+}
+
+.og-preview-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: #090909;
+  box-shadow: var(--shadow);
 }
 
 .primary-button,
@@ -327,14 +351,22 @@ a {
 }
 
 .fact-card-traffic {
-  min-width: 180px;
+  min-width: 220px;
 }
 
 .traffic-readout {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
+}
+
+.traffic-lane {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: max-content;
+  white-space: nowrap;
 }
 
 .traffic-indicator {
@@ -377,14 +409,45 @@ a {
   text-align: right;
 }
 
-.bootstrap-panel {
-  align-content: start;
-}
-
 .terminal-stage {
+  position: relative;
   min-height: 0;
   flex: 1;
   overflow: hidden;
+  isolation: isolate;
+}
+
+.terminal-stage::before,
+.terminal-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 3;
+}
+
+.terminal-stage::before {
+  inset: 6% auto -8% 8%;
+  width: min(34vw, 420px);
+  background: linear-gradient(180deg, rgba(255, 248, 180, 0.88), rgba(255, 170, 34, 0.55));
+  clip-path: polygon(56% 0%, 14% 31%, 44% 31%, 28% 100%, 88% 44%, 56% 44%);
+  filter: drop-shadow(0 0 24px rgba(255, 203, 89, 0.72));
+  transform: translate3d(0, -22%, 0) scale(0.84);
+}
+
+.terminal-stage::after {
+  background:
+    radial-gradient(circle at 26% 24%, rgba(255, 234, 126, 0.46), transparent 20%),
+    radial-gradient(circle at 36% 52%, rgba(255, 187, 51, 0.2), transparent 38%);
+}
+
+.terminal-stage.connection-strike::before {
+  animation: lightning-bolt 620ms ease-out forwards;
+}
+
+.terminal-stage.connection-strike::after {
+  animation: lightning-glow 620ms ease-out forwards;
 }
 
 .terminal-panel {
@@ -397,6 +460,55 @@ a {
     linear-gradient(180deg, rgba(255, 140, 38, 0.06), transparent 25%),
     #050505;
   box-shadow: var(--shadow);
+}
+
+.terminal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background:
+    linear-gradient(180deg, rgba(5, 5, 5, 0.5), rgba(5, 5, 5, 0.78)),
+    radial-gradient(circle at top left, rgba(255, 169, 61, 0.12), transparent 28%);
+  backdrop-filter: blur(4px);
+  transition:
+    opacity 180ms ease,
+    visibility 180ms ease,
+    transform 180ms ease;
+}
+
+.terminal-overlay.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.985);
+}
+
+.terminal-overlay-card {
+  width: min(860px, calc(100% - 24px));
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  background: rgba(10, 10, 10, 0.92);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.overlay-eyebrow {
+  margin-bottom: 0;
+}
+
+.terminal-overlay-card h2 {
+  margin: 0;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: clamp(1.4rem, 2vw, 1.85rem);
+}
+
+.overlay-command-output {
+  min-height: 168px;
 }
 
 .status-badge {
@@ -449,6 +561,42 @@ a {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 
+@keyframes lightning-bolt {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -22%, 0) scale(0.84);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  48% {
+    opacity: 0.92;
+    transform: translate3d(0, 3%, 0) scale(1.02);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 8%, 0) scale(1.05);
+  }
+}
+
+@keyframes lightning-glow {
+  0% {
+    opacity: 0;
+  }
+
+  16% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 @media (max-width: 1240px) {
   .session-topbar {
     grid-template-columns: 1fr;
@@ -457,6 +605,10 @@ a {
 
   .session-facts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .fact-card-traffic {
+    grid-column: span 2;
   }
 
   .topbar-actions {
@@ -475,6 +627,10 @@ a {
 
   .session-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fact-card-traffic {
+    grid-column: span 2;
   }
 
   .terminal-panel {
@@ -513,7 +669,21 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .fact-card-traffic {
+    grid-column: auto;
+  }
+
   .status-copy {
     text-align: left;
+  }
+
+  .terminal-overlay {
+    padding: 16px;
+  }
+
+  .terminal-overlay-card {
+    width: 100%;
+    padding: 18px;
+    border-radius: 18px;
   }
 }

@@ -142,6 +142,10 @@ async function handleRequest(request, env) {
     return serveAssetHtml(env, request, "/index.html");
   }
 
+  if (pathname === "/og-preview" || pathname === "/og-preview.html") {
+    return serveAssetHtml(env, request, "/og-preview.html");
+  }
+
   if (/^\/s\/[^/]+$/u.test(pathname)) {
     return serveAssetHtml(env, request, "/session.html");
   }
