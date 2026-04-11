@@ -1,6 +1,5 @@
 const WAIT_TIMEOUT_MS = 25_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 600_000;
-const DEFAULT_MAX_LIFETIME_MS = 3_600_000;
 const MIN_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 7_200_000;
 
@@ -46,6 +45,13 @@ function clampTimeout(value, fallback) {
   return Math.max(MIN_TIMEOUT_MS, Math.min(MAX_TIMEOUT_MS, value));
 }
 
+function parseOptionalTimeoutMs(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+  return Math.max(MIN_TIMEOUT_MS, Math.min(MAX_TIMEOUT_MS, value));
+}
+
 async function sha256Base64Url(value) {
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
   let binary = "";
@@ -69,7 +75,7 @@ export class SessionDurableObject {
     this.readonly = false;
     this.createdAt = 0;
     this.idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
-    this.maxLifetimeMs = DEFAULT_MAX_LIFETIME_MS;
+    this.maxLifetimeMs = null;
     this.initialized = false;
     this.agentConnectedAt = null;
     this.agentIp = null;
@@ -132,10 +138,10 @@ export class SessionDurableObject {
     }
 
     const now = Date.now();
-    const maxDeadline = this.createdAt + this.maxLifetimeMs;
+    const maxDeadline = Number.isFinite(this.maxLifetimeMs) ? this.createdAt + this.maxLifetimeMs : null;
     const idleDeadline = this.lastActivityAt + this.idleTimeoutMs;
 
-    if (now >= maxDeadline || now >= idleDeadline) {
+    if ((maxDeadline !== null && now >= maxDeadline) || now >= idleDeadline) {
       await this.endSession("expired", { closeBrowser: true });
     }
   }
@@ -267,7 +273,7 @@ export class SessionDurableObject {
       this.readonly = Boolean(payload.readonly);
       this.createdAt = Number.isFinite(Number(payload.createdAt)) ? Number(payload.createdAt) : Date.now();
       this.idleTimeoutMs = clampTimeout(Number(payload.idleTimeoutSeconds) * 1000, DEFAULT_IDLE_TIMEOUT_MS);
-      this.maxLifetimeMs = clampTimeout(Number(payload.maxLifetimeSeconds) * 1000, DEFAULT_MAX_LIFETIME_MS);
+      this.maxLifetimeMs = parseOptionalTimeoutMs(Number(payload.maxLifetimeSeconds) * 1000);
     }
 
     this.touchActivity();
