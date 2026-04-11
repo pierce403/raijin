@@ -417,37 +417,103 @@ a {
   isolation: isolate;
 }
 
-.terminal-stage::before,
-.terminal-stage::after {
-  content: "";
+.terminal-flash {
   position: absolute;
   inset: 0;
   pointer-events: none;
   opacity: 0;
   z-index: 3;
+  overflow: hidden;
 }
 
-.terminal-stage::before {
-  inset: 6% auto -8% 8%;
-  width: min(34vw, 420px);
-  background: linear-gradient(180deg, rgba(255, 248, 180, 0.88), rgba(255, 170, 34, 0.55));
-  clip-path: polygon(56% 0%, 14% 31%, 44% 31%, 28% 100%, 88% 44%, 56% 44%);
-  filter: drop-shadow(0 0 24px rgba(255, 203, 89, 0.72));
-  transform: translate3d(0, -22%, 0) scale(0.84);
+.terminal-flash::before,
+.terminal-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
 
-.terminal-stage::after {
+.terminal-flash::before {
+  inset: -10%;
   background:
-    radial-gradient(circle at 26% 24%, rgba(255, 234, 126, 0.46), transparent 20%),
-    radial-gradient(circle at 36% 52%, rgba(255, 187, 51, 0.2), transparent 38%);
+    radial-gradient(circle at 50% 50%, rgba(255, 227, 132, 0.2), transparent 16%),
+    radial-gradient(circle at 50% 50%, rgba(255, 194, 71, 0.12), transparent 34%),
+    radial-gradient(circle at 50% 50%, rgba(255, 194, 71, 0.06), transparent 56%);
+  filter: blur(18px);
 }
 
-.terminal-stage.connection-strike::before {
-  animation: lightning-bolt 620ms ease-out forwards;
+.terminal-flash::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 222, 130, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(255, 196, 79, 0.06), transparent 34%, rgba(255, 196, 79, 0.04));
 }
 
-.terminal-stage.connection-strike::after {
-  animation: lightning-glow 620ms ease-out forwards;
+.terminal-flash-svg {
+  position: absolute;
+  inset: -4%;
+  width: 108%;
+  height: 108%;
+}
+
+.flash-network path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+}
+
+.flash-network-main path {
+  stroke: #ffe49a;
+  stroke-width: 4;
+  filter:
+    drop-shadow(0 0 8px rgba(255, 237, 181, 0.44))
+    drop-shadow(0 0 20px rgba(255, 188, 64, 0.26));
+}
+
+.flash-network-branches path {
+  stroke: #ffc45e;
+  stroke-width: 2.4;
+  filter:
+    drop-shadow(0 0 6px rgba(255, 221, 145, 0.3))
+    drop-shadow(0 0 14px rgba(255, 180, 63, 0.2));
+}
+
+.terminal-stage.connection-strike .terminal-flash {
+  animation: fractal-flash 820ms ease-out forwards;
+}
+
+.terminal-stage.connection-strike .flash-network-main path {
+  animation: branch-zap 540ms cubic-bezier(0.2, 0.84, 0.26, 1) forwards;
+}
+
+.terminal-stage.connection-strike .flash-network-branches path {
+  animation: branch-zap 460ms cubic-bezier(0.24, 0.84, 0.26, 1) forwards;
+}
+
+.terminal-stage.connection-strike .flash-network-main path:nth-child(1) { animation-delay: 20ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(2) { animation-delay: 44ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(3) { animation-delay: 72ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(4) { animation-delay: 92ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(5) { animation-delay: 118ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(6) { animation-delay: 138ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(7) { animation-delay: 154ms; }
+.terminal-stage.connection-strike .flash-network-main path:nth-child(8) { animation-delay: 172ms; }
+
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(1) { animation-delay: 126ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(2) { animation-delay: 140ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(3) { animation-delay: 164ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(4) { animation-delay: 176ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(5) { animation-delay: 194ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(6) { animation-delay: 206ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(7) { animation-delay: 226ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(8) { animation-delay: 240ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(9) { animation-delay: 254ms; }
+.terminal-stage.connection-strike .flash-network-branches path:nth-child(10) { animation-delay: 268ms; }
+
+.terminal-stage.connection-strike .terminal-panel {
+  animation: terminal-energize 820ms ease-out forwards;
 }
 
 .terminal-panel {
@@ -561,39 +627,71 @@ a {
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
 }
 
-@keyframes lightning-bolt {
+@keyframes fractal-flash {
   0% {
     opacity: 0;
-    transform: translate3d(0, -22%, 0) scale(0.84);
-  }
-
-  18% {
-    opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  48% {
-    opacity: 0.92;
-    transform: translate3d(0, 3%, 0) scale(1.02);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate3d(0, 8%, 0) scale(1.05);
-  }
-}
-
-@keyframes lightning-glow {
-  0% {
-    opacity: 0;
   }
 
   16% {
     opacity: 1;
   }
 
+  56% {
+    opacity: 0.74;
+  }
+
   100% {
     opacity: 0;
+  }
+}
+
+@keyframes branch-zap {
+  0% {
+    opacity: 0;
+    stroke-dashoffset: 1200;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  64% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -60;
+  }
+}
+
+@keyframes terminal-energize {
+  0% {
+    box-shadow: var(--shadow);
+    filter: brightness(1) saturate(1);
+  }
+
+  16% {
+    box-shadow:
+      0 0 0 1px rgba(255, 205, 98, 0.18),
+      0 0 28px rgba(255, 205, 98, 0.1),
+      0 24px 80px rgba(0, 0, 0, 0.5);
+    filter: brightness(1.05) saturate(1.03);
+  }
+
+  44% {
+    box-shadow:
+      0 0 0 1px rgba(255, 205, 98, 0.14),
+      0 0 18px rgba(255, 205, 98, 0.07),
+      0 24px 80px rgba(0, 0, 0, 0.5);
+    filter: brightness(1.03) saturate(1.02);
+  }
+
+  100% {
+    box-shadow: var(--shadow);
+    filter: brightness(1) saturate(1);
   }
 }
 

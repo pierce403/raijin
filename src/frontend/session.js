@@ -160,7 +160,7 @@ function playConnectionFlash() {
   window.clearTimeout(flashTimer);
   flashTimer = window.setTimeout(() => {
     terminalStage.classList.remove("connection-strike");
-  }, 720);
+  }, 840);
 }
 
 function updateLayoutForStatus(status) {
