@@ -11,66 +11,75 @@
     <script type="module" src="/src/frontend/session.js"></script>
   </head>
   <body class="page page-session">
-    <main class="session-layout">
-      <section class="session-sidebar">
-        <div class="brand-block">
+    <main class="session-screen">
+      <section class="panel session-topbar">
+        <div class="topbar-brand">
           <p class="eyebrow">raijin.sh</p>
-          <h1>Session</h1>
+          <h1>Live Session</h1>
           <p class="lede compact">
-            Temporary shell bridge for systems you control.
+            Active shell access to the current environment.
           </p>
         </div>
 
-        <div class="warning-banner" role="alert">
-          <strong>Warning:</strong> active shell access is granted to the current
-          environment until the session ends.
-        </div>
-
-        <div class="panel status-panel">
-          <div class="status-row">
+        <div class="session-facts">
+          <div class="fact-card">
             <span>Status</span>
             <span id="status-badge" class="status-badge status-waiting">
               waiting for browser
             </span>
           </div>
-          <div class="status-row">
+          <div class="fact-card">
             <span>Mode</span>
-            <span id="mode-label">interactive</span>
+            <code id="mode-label">interactive</code>
           </div>
-          <div class="status-row">
+          <div class="fact-card">
             <span>Session</span>
             <code id="session-id">...</code>
           </div>
+          <div class="fact-card">
+            <span>Remote IP</span>
+            <code id="remote-ip">pending</code>
+          </div>
+          <div class="fact-card fact-card-traffic">
+            <span>Relay</span>
+            <div class="traffic-readout">
+              <span id="tx-indicator" class="traffic-indicator">tx</span>
+              <code id="tx-count">0 B</code>
+              <span id="rx-indicator" class="traffic-indicator">rx</span>
+              <code id="rx-count">0 B</code>
+            </div>
+          </div>
         </div>
 
-        <div class="panel command-panel">
-          <header class="panel-header compact">
-            <h2>Bootstrap Command</h2>
-            <p>Run this inside the Linux container or VM you control.</p>
-          </header>
-          <textarea
-            id="bootstrap-command"
-            class="command-output"
-            readonly
-            spellcheck="false"
-          ></textarea>
-          <div class="action-row">
-            <button id="copy-command" class="secondary-button" type="button">
-              Copy Command
-            </button>
-            <button id="end-session" class="danger-button" type="button">
-              End Session
-            </button>
-          </div>
-          <p id="session-error" class="form-error" hidden></p>
+        <div class="topbar-actions">
+          <p id="status-copy" class="status-copy">Listening for connection...</p>
+          <button id="end-session" class="danger-button" type="button">
+            End Session
+          </button>
+        </div>
+
+        <p id="session-error" class="form-error" hidden></p>
+      </section>
+
+      <section id="bootstrap-panel" class="panel bootstrap-panel">
+        <header class="panel-header compact">
+          <h2>Bootstrap Command</h2>
+          <p>Run this inside the Linux container or VM you control.</p>
+        </header>
+        <textarea
+          id="bootstrap-command"
+          class="command-output"
+          readonly
+          spellcheck="false"
+        ></textarea>
+        <div class="action-row">
+          <button id="copy-command" class="secondary-button" type="button">
+            Copy Command
+          </button>
         </div>
       </section>
 
-      <section class="terminal-shell">
-        <header class="terminal-header">
-          <h2>Terminal</h2>
-          <p id="status-copy">Listening for connection...</p>
-        </header>
+      <section class="terminal-stage">
         <div id="terminal" class="terminal-panel" aria-label="Live terminal"></div>
       </section>
     </main>

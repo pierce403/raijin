@@ -16,13 +16,20 @@ const statusBadge = document.querySelector("#status-badge");
 const statusCopy = document.querySelector("#status-copy");
 const modeLabel = document.querySelector("#mode-label");
 const sessionIdNode = document.querySelector("#session-id");
+const remoteIpNode = document.querySelector("#remote-ip");
+const bootstrapPanel = document.querySelector("#bootstrap-panel");
 const bootstrapNode = document.querySelector("#bootstrap-command");
 const copyButton = document.querySelector("#copy-command");
 const endButton = document.querySelector("#end-session");
 const errorNode = document.querySelector("#session-error");
 const terminalContainer = document.querySelector("#terminal");
+const txIndicator = document.querySelector("#tx-indicator");
+const rxIndicator = document.querySelector("#rx-indicator");
+const txCountNode = document.querySelector("#tx-count");
+const rxCountNode = document.querySelector("#rx-count");
 
 const sessionId = window.location.pathname.split("/").filter(Boolean).at(-1);
+const encoder = new TextEncoder();
 
 const terminal = new Terminal({
   allowTransparency: false,
@@ -61,6 +68,10 @@ let websocket;
 let sessionInfo;
 let ended = false;
 let inputDisposable;
+let hasConnected = false;
+let txBytes = 0;
+let rxBytes = 0;
+const trafficTimers = new WeakMap();
 
 function clearLocalSession() {
   deleteSession(sessionId);
@@ -74,6 +85,84 @@ function setError(message) {
   }
   errorNode.hidden = false;
   errorNode.textContent = message;
+}
+
+function formatTraffic(bytes) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderTraffic() {
+  txCountNode.textContent = formatTraffic(txBytes);
+  rxCountNode.textContent = formatTraffic(rxBytes);
+}
+
+function pulseIndicator(node) {
+  if (!node) {
+    return;
+  }
+
+  node.classList.remove("is-active");
+  void node.offsetWidth;
+  node.classList.add("is-active");
+
+  const existingTimer = trafficTimers.get(node);
+  if (existingTimer) {
+    window.clearTimeout(existingTimer);
+  }
+
+  const timer = window.setTimeout(() => {
+    node.classList.remove("is-active");
+    trafficTimers.delete(node);
+  }, 260);
+
+  trafficTimers.set(node, timer);
+}
+
+function recordTraffic(direction, size) {
+  if (!Number.isFinite(size) || size <= 0) {
+    return;
+  }
+
+  if (direction === "tx") {
+    txBytes += size;
+    renderTraffic();
+    pulseIndicator(txIndicator);
+    return;
+  }
+
+  rxBytes += size;
+  renderTraffic();
+  pulseIndicator(rxIndicator);
+}
+
+function setRemoteIp(remoteIp) {
+  remoteIpNode.textContent = remoteIp || "pending";
+}
+
+function updateLayoutForStatus(status) {
+  if (status === "connected") {
+    hasConnected = true;
+  }
+
+  document.body.classList.toggle("session-live", hasConnected);
+
+  if (hasConnected) {
+    bootstrapPanel.hidden = true;
+    window.requestAnimationFrame(() => {
+      fitTerminalAndNotify();
+    });
+    return;
+  }
+
+  bootstrapPanel.hidden = false;
 }
 
 function setStatus(status) {
@@ -101,7 +190,7 @@ function setStatus(status) {
   };
 
   statusCopy.textContent = copyMap[normalized] || label;
-
+  updateLayoutForStatus(normalized);
 }
 
 function decodeBase64ToBytes(base64) {
@@ -138,7 +227,10 @@ function sendMessage(message) {
   if (!websocket || websocket.readyState !== WebSocket.OPEN || ended) {
     return;
   }
-  websocket.send(JSON.stringify(message));
+
+  const payload = JSON.stringify(message);
+  websocket.send(payload);
+  recordTraffic("tx", encoder.encode(payload).length);
 }
 
 function attachTerminalIO() {
@@ -167,9 +259,14 @@ function fitTerminalAndNotify() {
 }
 
 function handleSocketMessage(event) {
+  if (typeof event.data === "string") {
+    recordTraffic("rx", encoder.encode(event.data).length);
+  }
+
   const message = JSON.parse(event.data);
 
   if (message.type === "status") {
+    setRemoteIp(message.remoteIp);
     setStatus(message.status);
     if (message.status === "connected") {
       terminal.focus();
@@ -291,7 +388,9 @@ async function init() {
 
     sessionIdNode.textContent = sessionInfo.sessionId;
     modeLabel.textContent = sessionInfo.mode;
+    setRemoteIp("");
     bootstrapNode.value = buildBootstrapCommand(sessionInfo, window.location.origin);
+    renderTraffic();
     setStatus("waiting_for_browser");
     attachTerminalIO();
     await connectBrowserSocket();

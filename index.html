@@ -18,63 +18,24 @@
     <main class="shell-layout">
       <section class="hero-card">
         <p class="eyebrow">raijin.sh</p>
-        <h1>Ephemeral shell access for troubleshooting the systems you control.</h1>
+        <h1>Open a shell.</h1>
         <p class="lede">
-          Start a temporary session, paste a one-line Python bootstrap into a Linux VM
-          or container you administer, and work in a live browser terminal. No daemon.
-          No install residue. No persistence by default.
+          Start a temporary interactive session, paste a one-line Python bootstrap into
+          a Linux VM or container you control, and drop straight into a live browser
+          terminal.
         </p>
         <div class="warning-banner" role="alert">
           <strong>Warning:</strong> this grants remote shell access to the current
           environment. Use it only on systems you control.
         </div>
-      </section>
-
-      <section class="panel session-create-panel">
-        <header class="panel-header">
-          <h2>New Session</h2>
-          <p>Keep the first version small, explicit, and visible.</p>
-        </header>
-
-        <form id="new-session-form" class="session-form">
-          <fieldset class="mode-group">
-            <legend>Mode</legend>
-            <label class="mode-option">
-              <input type="radio" name="mode" value="interactive" checked />
-              <span>Interactive shell</span>
-            </label>
-            <label class="mode-option">
-              <input type="radio" name="mode" value="command" />
-              <span>Forced command</span>
-            </label>
-            <label class="mode-option">
-              <input type="radio" name="mode" value="readonly" />
-              <span>Readonly shell</span>
-            </label>
-          </fieldset>
-
-          <label class="stack-field">
-            <span>Forced command</span>
-            <input
-              id="command-input"
-              name="command"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="uname -a && id"
-            />
-          </label>
-
-          <div class="submit-row">
-            <button id="create-button" class="primary-button" type="submit">
-              New Session
-            </button>
-            <p class="helper-copy">
-              Default idle timeout: 10 minutes. Hard max lifetime: 60 minutes.
-            </p>
-          </div>
-        </form>
-
+        <div class="hero-actions">
+          <button id="create-button" class="primary-button hero-button" type="button">
+            New Session
+          </button>
+          <p class="helper-copy">
+            Interactive shell. 10 minute idle timeout. 60 minute hard max.
+          </p>
+        </div>
         <p id="home-error" class="form-error" hidden></p>
       </section>
     </main>

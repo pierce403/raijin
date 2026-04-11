@@ -25,6 +25,20 @@ function readBearerToken(request) {
   return null;
 }
 
+function readClientIp(request) {
+  const direct = request.headers.get("cf-connecting-ip") || request.headers.get("x-real-ip");
+  if (direct) {
+    return direct;
+  }
+
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (!forwarded) {
+    return null;
+  }
+
+  return forwarded.split(",")[0].trim() || null;
+}
+
 function clampTimeout(value, fallback) {
   if (!Number.isFinite(value)) {
     return fallback;
@@ -58,6 +72,7 @@ export class SessionDurableObject {
     this.maxLifetimeMs = DEFAULT_MAX_LIFETIME_MS;
     this.initialized = false;
     this.agentConnectedAt = null;
+    this.agentIp = null;
     this.lastActivityAt = 0;
     this.pendingEvents = [];
     this.waiters = [];
@@ -312,9 +327,24 @@ export class SessionDurableObject {
     return { ok: true };
   }
 
-  markAgentConnected() {
+  updateAgentIdentity(request) {
+    const nextIp = readClientIp(request);
+    if (nextIp && nextIp !== this.agentIp) {
+      this.agentIp = nextIp;
+      return true;
+    }
+    return false;
+  }
+
+  markAgentConnected(request) {
+    const ipChanged = this.updateAgentIdentity(request);
     if (!this.agentConnectedAt) {
       this.agentConnectedAt = Date.now();
+      this.sendStatus();
+      return;
+    }
+
+    if (ipChanged) {
       this.sendStatus();
     }
   }
@@ -325,7 +355,7 @@ export class SessionDurableObject {
       return auth.response;
     }
 
-    this.markAgentConnected();
+    this.markAgentConnected(request);
     await this.checkExpiry();
 
     const immediate = this.flushEvents();
@@ -354,7 +384,7 @@ export class SessionDurableObject {
       return auth.response;
     }
 
-    this.markAgentConnected();
+    this.markAgentConnected(request);
     await this.checkExpiry();
     if (this.endedAt) {
       return jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 });
@@ -375,7 +405,7 @@ export class SessionDurableObject {
       return auth.response;
     }
 
-    this.markAgentConnected();
+    this.markAgentConnected(request);
     await this.checkExpiry();
     if (this.endedAt) {
       return jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 });
@@ -458,7 +488,12 @@ export class SessionDurableObject {
     if (!socket || socket.readyState !== 1) {
       return;
     }
-    socket.send(JSON.stringify({ type: "status", status: this.currentStatus() }));
+    socket.send(JSON.stringify({
+      type: "status",
+      status: this.currentStatus(),
+      remoteIp: this.agentIp,
+      connectedAt: this.agentConnectedAt,
+    }));
   }
 
   async endSession(reason, options = {}) {
@@ -472,7 +507,12 @@ export class SessionDurableObject {
     this.flushWaiters();
 
     if (this.browserSocket && this.browserSocket.readyState === 1) {
-      this.browserSocket.send(JSON.stringify({ type: "status", status: reason }));
+      this.browserSocket.send(JSON.stringify({
+        type: "status",
+        status: reason,
+        remoteIp: this.agentIp,
+        connectedAt: this.agentConnectedAt,
+      }));
       if (options.message) {
         this.browserSocket.send(JSON.stringify({ type: "notice", message: options.message }));
       }
