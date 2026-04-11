@@ -181,6 +181,33 @@ a {
   min-width: 180px;
 }
 
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--orange-bright);
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+}
+
+.github-link::before {
+  content: "↗";
+  color: var(--text-soft);
+}
+
+.github-link:hover {
+  color: #ffd49d;
+}
+
+.github-link-home {
+  margin-top: 4px;
+}
+
+.github-link-session {
+  margin-top: 10px;
+}
+
 .session-form,
 .mode-group,
 .stack-field,
