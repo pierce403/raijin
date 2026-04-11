@@ -87,7 +87,7 @@
       font-family="IBM Plex Sans, Segoe UI, sans-serif"
       font-size="30"
     >
-      <tspan x="0" dy="0">Browser-owned relay for Linux systems</tspan>
+      <tspan x="0" dy="0">Browser-owned relay for systems</tspan>
       <tspan x="0" dy="40">you control. One command. No daemon.</tspan>
     </text>
 
