@@ -112,6 +112,13 @@ a {
   padding: 32px;
 }
 
+.hero-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .panel {
   padding: 24px;
 }
@@ -135,9 +142,9 @@ a {
 }
 
 .hero-card h1 {
-  max-width: 9ch;
   font-size: clamp(2.2rem, 5vw, 3.8rem);
   line-height: 0.98;
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -191,8 +198,10 @@ a {
   letter-spacing: 0.04em;
 }
 
-.github-link::before {
-  content: "↗";
+.github-link-icon {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: none;
   color: var(--text-soft);
 }
 
@@ -200,8 +209,12 @@ a {
   color: #ffd49d;
 }
 
+.github-link:hover .github-link-icon {
+  color: #ffd49d;
+}
+
 .github-link-home {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .github-link-session {
@@ -776,6 +789,11 @@ a {
   .panel {
     padding: 20px;
     border-radius: 18px;
+  }
+
+  .hero-card-top {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .submit-row,
