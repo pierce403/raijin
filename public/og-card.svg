@@ -91,7 +91,7 @@
       <tspan x="0" dy="40">you control. One command. No daemon.</tspan>
     </text>
 
-    <g transform="translate(0 486)">
+    <g transform="translate(0 452)">
       <rect x="0" y="0" width="214" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
       <rect x="228" y="0" width="172" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
       <rect x="414" y="0" width="166" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
@@ -139,29 +139,27 @@
       connected
     </text>
 
-    <g transform="translate(30 168)" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="20">
+    <g transform="translate(30 168)" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="17">
       <text x="0" y="0" fill="#ffd49d">$ python3 -c ...</text>
-      <text x="0" y="48" fill="#85ddd8">$ uptime</text>
-      <text x="0" y="82" fill="#f6f1eb">up 18 days, load 0.12</text>
-      <text x="0" y="140" fill="#85ddd8">$ kubectl get pods</text>
-      <text x="0" y="174" fill="#f6f1eb">api-58f7d   1/1 Running</text>
-      <text x="0" y="208" fill="#f6f1eb">worker-1d2  1/1 Running</text>
-      <text x="0" y="242" fill="#f6f1eb">jobs-0db2   0/1 Pending</text>
-      <text x="0" y="300" fill="#85ddd8">$ journalctl -n 2</text>
-      <text x="0" y="334" fill="#f6f1eb">[ok] network-online.target</text>
-      <text x="0" y="368" fill="#f6f1eb">[warn] kubelet restarting pod</text>
+      <text x="0" y="40" fill="#85ddd8">$ uptime</text>
+      <text x="0" y="68" fill="#f6f1eb">up 18 days, load 0.12</text>
+      <text x="0" y="118" fill="#85ddd8">$ kubectl get pods</text>
+      <text x="0" y="146" fill="#f6f1eb">api-58f7d   1/1 Running</text>
+      <text x="0" y="174" fill="#f6f1eb">worker-1d2  1/1 Running</text>
+      <text x="0" y="202" fill="#f6f1eb">jobs-0db2   0/1 Pending</text>
+      <text x="0" y="254" fill="#ffd49d">relay active</text>
     </g>
   </g>
 
-  <g transform="translate(1004 430)">
+  <g transform="translate(1034 452)">
     <path
-      d="M58 0L0 88H36L22 170L106 68H66L58 0Z"
+      d="M46 0L0 70H28L18 138L86 54H54L46 0Z"
       fill="url(#accent)"
       fill-opacity="0.84"
       filter="url(#softGlow)"
     />
     <path
-      d="M58 0L0 88H36L22 170L106 68H66L58 0Z"
+      d="M46 0L0 70H28L18 138L86 54H54L46 0Z"
       fill="url(#accent)"
       stroke="#fff0c1"
       stroke-width="3"
