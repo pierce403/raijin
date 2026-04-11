@@ -20,6 +20,8 @@ Keep updates specific. Prefer exact commands, file paths, and failure modes over
 - Favor end-to-end working paths over abstractions.
 - This repo should be committed and pushed after every completed task unless the user explicitly says not to.
 - Stage only files relevant to the task. Do not silently include unrelated work.
+- On the landing page, do not surface OpenGraph metadata as a separate preview card unless explicitly requested.
+- Avoid heavy em dash usage in UI copy and metadata; prefer plain punctuation/hyphenated phrasing.
 
 ## Project Overview
 

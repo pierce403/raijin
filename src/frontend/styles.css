@@ -65,7 +65,7 @@ a {
   gap: 24px;
   align-content: center;
   min-height: 100vh;
-  grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -102,44 +102,6 @@ a {
 
 .hero-card {
   padding: 32px;
-}
-
-.og-preview-pane {
-  align-self: stretch;
-}
-
-.og-card {
-  margin-top: 10px;
-  padding: 18px;
-  border-radius: 18px;
-  border: 1px solid var(--border);
-  background:
-    linear-gradient(160deg, rgba(255, 171, 77, 0.08), rgba(10, 10, 10, 0.7)),
-    rgba(8, 8, 8, 0.85);
-}
-
-.og-domain {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.og-card h3 {
-  margin: 8px 0 10px;
-  font-size: 1.15rem;
-}
-
-.og-card p {
-  margin: 0 0 12px;
-  color: var(--text-muted);
-}
-
-.og-card ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--text-soft);
 }
 
 .panel {
