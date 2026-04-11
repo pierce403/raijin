@@ -92,16 +92,16 @@
     </text>
 
     <g transform="translate(0 486)">
-      <rect x="0" y="0" width="194" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
-      <rect x="208" y="0" width="184" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
-      <rect x="406" y="0" width="174" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
-      <text x="24" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+      <rect x="0" y="0" width="214" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <rect x="228" y="0" width="172" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <rect x="414" y="0" width="166" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <text x="22" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="17">
         one-line bootstrap
       </text>
-      <text x="232" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+      <text x="251" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="17">
         browser-owned
       </text>
-      <text x="430" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+      <text x="435" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="17">
         zero install
       </text>
     </g>
