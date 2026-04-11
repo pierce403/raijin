@@ -71,6 +71,9 @@ npx wrangler deploy --dry-run
 - `wrangler dev` may still show unrelated local environment variables from `.dev.vars`.
   The current app does not require `SESSION_SIGNING_KEY`; ignore that leftover local env unless the config is later cleaned up locally.
 
+- To disable the hard max lifetime, set `maxLifetimeSeconds: null` in browser session metadata.
+  `src/session-do.js` treats missing/non-positive `maxLifetimeSeconds` as unlimited while still enforcing idle timeout expiry.
+
 ## Remote Bootstrap Notes
 
 - The bootstrap uses Python 3 stdlib only.

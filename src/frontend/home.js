@@ -5,7 +5,6 @@ const errorNode = document.querySelector("#home-error");
 const createButton = document.querySelector("#create-button");
 
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 600;
-const DEFAULT_MAX_LIFETIME_SECONDS = 3600;
 
 function setError(message) {
   if (!message) {
@@ -33,7 +32,7 @@ createButton.addEventListener("click", async () => {
       readonly: false,
       createdAt: now,
       idleTimeoutSeconds: DEFAULT_IDLE_TIMEOUT_SECONDS,
-      maxLifetimeSeconds: DEFAULT_MAX_LIFETIME_SECONDS,
+      maxLifetimeSeconds: null,
     };
 
     saveSession(session);
