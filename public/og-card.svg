@@ -1,63 +1,67 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="raijin.sh social preview">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#050505" />
-      <stop offset="48%" stop-color="#120b06" />
-      <stop offset="100%" stop-color="#060606" />
+      <stop offset="0%" stop-color="#030303" />
+      <stop offset="42%" stop-color="#110a06" />
+      <stop offset="100%" stop-color="#050505" />
     </linearGradient>
     <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0d0d0d" />
-      <stop offset="100%" stop-color="#17110c" />
+      <stop offset="0%" stop-color="#0c0c0c" />
+      <stop offset="100%" stop-color="#17100c" />
     </linearGradient>
     <linearGradient id="terminalPanel" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#070707" />
-      <stop offset="100%" stop-color="#111111" />
+      <stop offset="100%" stop-color="#101010" />
     </linearGradient>
     <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ffe08d" />
+      <stop offset="0%" stop-color="#fff0b0" />
       <stop offset="100%" stop-color="#ff8a1f" />
     </linearGradient>
-    <radialGradient id="warmGlow" cx="74%" cy="30%" r="48%">
-      <stop offset="0%" stop-color="#ffb14d" stop-opacity="0.3" />
-      <stop offset="100%" stop-color="#ffb14d" stop-opacity="0" />
+    <linearGradient id="slash" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffcf73" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#ff8a1f" stop-opacity="0.03" />
+    </linearGradient>
+    <radialGradient id="flare" cx="78%" cy="34%" r="54%">
+      <stop offset="0%" stop-color="#ffbd5e" stop-opacity="0.34" />
+      <stop offset="100%" stop-color="#ffbd5e" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="terminalGlow" cx="76%" cy="42%" r="42%">
+      <stop offset="0%" stop-color="#ffd27d" stop-opacity="0.22" />
+      <stop offset="100%" stop-color="#ffd27d" stop-opacity="0" />
     </radialGradient>
     <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="14" />
     </filter>
+    <filter id="branchGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="8" />
+    </filter>
   </defs>
 
   <rect width="1200" height="630" fill="url(#bg)" />
-  <rect width="1200" height="630" fill="url(#warmGlow)" />
+  <rect width="1200" height="630" fill="url(#flare)" />
 
-  <g opacity="0.16">
-    <path d="M0 106H1200" stroke="#ff8a1f" stroke-width="1" />
-    <path d="M0 206H1200" stroke="#ff8a1f" stroke-width="1" />
-    <path d="M0 306H1200" stroke="#ff8a1f" stroke-width="1" />
-    <path d="M0 406H1200" stroke="#ff8a1f" stroke-width="1" />
-    <path d="M0 506H1200" stroke="#ff8a1f" stroke-width="1" />
+  <g opacity="0.09">
+    <path d="M0 78L1200 78" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 156L1200 156" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 234L1200 234" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 312L1200 312" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 390L1200 390" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 468L1200 468" stroke="#ff8a1f" stroke-width="1" />
+    <path d="M0 546L1200 546" stroke="#ff8a1f" stroke-width="1" />
   </g>
 
-  <rect
-    x="48"
-    y="44"
-    width="1104"
-    height="542"
-    rx="36"
-    fill="url(#panel)"
-    stroke="#ff8a1f"
-    stroke-opacity="0.42"
-    stroke-width="2"
-  />
+  <rect x="34" y="34" width="1132" height="562" rx="42" fill="url(#panel)" stroke="#ff8a1f" stroke-opacity="0.34" stroke-width="2" />
+  <path d="M692 34L1166 34L940 596L600 596Z" fill="url(#slash)" />
+  <rect x="702" y="68" width="2" height="494" fill="#ff8a1f" fill-opacity="0.16" />
+  <ellipse cx="926" cy="316" rx="260" ry="250" fill="url(#terminalGlow)" />
 
-  <rect x="718" y="78" width="2" height="474" fill="#ff8a1f" fill-opacity="0.18" />
-
-  <g transform="translate(92 90)">
+  <g transform="translate(88 88)">
     <text
       x="0"
       y="0"
       fill="#ffbf70"
       font-family="IBM Plex Mono, SFMono-Regular, monospace"
-      font-size="25"
+      font-size="24"
       letter-spacing="5"
     >
       RAIJIN.SH
@@ -65,147 +69,101 @@
 
     <text
       x="0"
-      y="102"
-      fill="#fff5ea"
+      y="114"
+      fill="#fff6ea"
       font-family="IBM Plex Sans, Segoe UI, sans-serif"
-      font-size="64"
+      font-size="88"
       font-weight="700"
     >
-      <tspan x="0" dy="0">Browser-owned</tspan>
-      <tspan x="0" dy="72">live shell</tspan>
-      <tspan x="0" dy="72">access</tspan>
+      <tspan x="0" dy="0">LIVE</tspan>
+      <tspan x="0" dy="94">SHELL</tspan>
+      <tspan x="0" dy="94">ACCESS</tspan>
     </text>
 
     <text
       x="0"
-      y="334"
-      fill="#d8c6b4"
+      y="402"
+      fill="#dbc8b6"
       font-family="IBM Plex Sans, Segoe UI, sans-serif"
-      font-size="29"
+      font-size="30"
     >
-      <tspan x="0" dy="0">Start a temporary session, paste one</tspan>
-      <tspan x="0" dy="38">Python command, and connect from</tspan>
-      <tspan x="0" dy="38">any Linux host you control.</tspan>
+      <tspan x="0" dy="0">Browser-owned relay for Linux systems</tspan>
+      <tspan x="0" dy="40">you control. One command. No daemon.</tspan>
     </text>
 
-    <g transform="translate(0 430)">
-      <rect x="0" y="0" width="184" height="44" rx="22" fill="#23140a" stroke="#ff8a1f" />
-      <rect x="198" y="0" width="144" height="44" rx="22" fill="#23140a" stroke="#ff8a1f" />
-      <rect x="356" y="0" width="188" height="44" rx="22" fill="#23140a" stroke="#ff8a1f" />
-      <text x="24" y="29" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+    <g transform="translate(0 486)">
+      <rect x="0" y="0" width="194" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <rect x="208" y="0" width="184" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <rect x="406" y="0" width="174" height="46" rx="23" fill="#211209" stroke="#ff8a1f" />
+      <text x="24" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
         one-line bootstrap
       </text>
-      <text x="222" y="29" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+      <text x="232" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+        browser-owned
+      </text>
+      <text x="430" y="30" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
         zero install
       </text>
-      <text x="380" y="29" fill="#ffd49d" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
-        in-memory relay
-      </text>
     </g>
-
-    <text
-      x="0"
-      y="512"
-      fill="#8f8174"
-      font-family="IBM Plex Mono, SFMono-Regular, monospace"
-      font-size="18"
-    >
-      Temporary browser-to-terminal bridge for systems you control.
-    </text>
   </g>
 
-  <g opacity="0.42">
-    <path
-      d="M676 170L720 214L770 252L824 300L882 338L940 390L1004 438"
-      stroke="#ffbf70"
-      stroke-width="2.4"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      fill="none"
-      filter="url(#softGlow)"
-    />
-    <path
-      d="M680 212L724 240L756 274L796 304"
-      stroke="#ffd995"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      fill="none"
-      filter="url(#softGlow)"
-    />
-    <path
-      d="M820 300L792 346L760 384L722 428"
-      stroke="#ffd995"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      fill="none"
-      filter="url(#softGlow)"
-    />
-    <path
-      d="M882 338L924 320L972 312L1020 308"
-      stroke="#ffd995"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      fill="none"
-      filter="url(#softGlow)"
-    />
-    <path
-      d="M940 390L980 430L1016 468L1050 506"
-      stroke="#ffd995"
-      stroke-width="1.8"
-      stroke-linecap="round"
-      fill="none"
-      filter="url(#softGlow)"
-    />
+  <g opacity="0.44" filter="url(#branchGlow)">
+    <path d="M670 320L742 262L802 188L870 126L948 62" stroke="#ffcf73" stroke-width="6" stroke-linecap="round" fill="none" />
+    <path d="M670 320L742 356L808 416L876 470L950 530L1034 590" stroke="#ffcf73" stroke-width="6" stroke-linecap="round" fill="none" />
+    <path d="M670 320L760 320L850 308L950 286L1066 266" stroke="#ffcf73" stroke-width="6" stroke-linecap="round" fill="none" />
   </g>
 
-  <g transform="translate(770 86)">
-    <rect
-      x="0"
-      y="0"
-      width="334"
-      height="458"
-      rx="28"
-      fill="url(#terminalPanel)"
-      stroke="#ff8a1f"
-      stroke-width="2"
-    />
-    <rect x="22" y="22" width="290" height="46" rx="16" fill="#17100a" />
-    <circle cx="46" cy="45" r="6" fill="#ff5a36" />
-    <circle cx="66" cy="45" r="6" fill="#ffbf70" />
-    <circle cx="86" cy="45" r="6" fill="#89d39b" />
-    <text x="118" y="51" fill="#f0dfcd" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
+  <g opacity="0.7">
+    <path d="M670 320L742 262L802 188L870 126L948 62" stroke="#ffeab0" stroke-width="2.8" stroke-linecap="round" fill="none" />
+    <path d="M670 320L742 356L808 416L876 470L950 530L1034 590" stroke="#ffeab0" stroke-width="2.8" stroke-linecap="round" fill="none" />
+    <path d="M670 320L760 320L850 308L950 286L1066 266" stroke="#ffeab0" stroke-width="2.8" stroke-linecap="round" fill="none" />
+    <path d="M742 262L722 214L702 168L676 118L654 74" stroke="#ffd995" stroke-width="1.9" stroke-linecap="round" fill="none" />
+    <path d="M802 188L838 198L876 210L918 222" stroke="#ffd995" stroke-width="1.9" stroke-linecap="round" fill="none" />
+    <path d="M808 416L772 470L736 524L710 576" stroke="#ffd995" stroke-width="1.9" stroke-linecap="round" fill="none" />
+    <path d="M876 470L920 454L964 440L1016 432" stroke="#ffd995" stroke-width="1.9" stroke-linecap="round" fill="none" />
+    <path d="M950 286L972 244L1004 208L1044 170" stroke="#ffd995" stroke-width="1.9" stroke-linecap="round" fill="none" />
+  </g>
+
+  <g transform="translate(748 86)">
+    <rect x="0" y="0" width="364" height="458" rx="30" fill="url(#terminalPanel)" stroke="#ff8a1f" stroke-width="2" />
+    <rect x="24" y="24" width="316" height="48" rx="16" fill="#15100c" />
+    <circle cx="50" cy="48" r="6" fill="#ff5a36" />
+    <circle cx="70" cy="48" r="6" fill="#ffbf70" />
+    <circle cx="90" cy="48" r="6" fill="#89d39b" />
+    <text x="128" y="54" fill="#f2e1cf" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="18">
       live session
     </text>
 
-    <rect x="22" y="92" width="112" height="32" rx="16" fill="#1f2414" />
-    <text x="48" y="114" fill="#9ff1be" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="16">
+    <rect x="24" y="96" width="126" height="34" rx="17" fill="#1d2515" />
+    <text x="50" y="119" fill="#a6f6c2" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="16">
       connected
     </text>
 
-    <g transform="translate(28 164)" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="19">
+    <g transform="translate(30 168)" font-family="IBM Plex Mono, SFMono-Regular, monospace" font-size="20">
       <text x="0" y="0" fill="#ffd49d">$ python3 -c ...</text>
-      <text x="0" y="44" fill="#85ddd8">$ uname -a</text>
-      <text x="0" y="76" fill="#f6f1eb">Linux 6.8.0 x86_64</text>
-      <text x="0" y="128" fill="#85ddd8">$ journalctl -n 3</text>
-      <text x="0" y="160" fill="#f6f1eb">[ok] network-online</text>
-      <text x="0" y="192" fill="#f6f1eb">[warn] kubelet restart</text>
-      <text x="0" y="244" fill="#85ddd8">$ kubectl get pods</text>
-      <text x="0" y="276" fill="#f6f1eb">api-58f7d 1/1 Running</text>
-      <text x="0" y="308" fill="#f6f1eb">jobs-0db2 0/1 Pending</text>
+      <text x="0" y="48" fill="#85ddd8">$ uptime</text>
+      <text x="0" y="82" fill="#f6f1eb">up 18 days, load 0.12</text>
+      <text x="0" y="140" fill="#85ddd8">$ kubectl get pods</text>
+      <text x="0" y="174" fill="#f6f1eb">api-58f7d   1/1 Running</text>
+      <text x="0" y="208" fill="#f6f1eb">worker-1d2  1/1 Running</text>
+      <text x="0" y="242" fill="#f6f1eb">jobs-0db2   0/1 Pending</text>
+      <text x="0" y="300" fill="#85ddd8">$ journalctl -n 2</text>
+      <text x="0" y="334" fill="#f6f1eb">[ok] network-online.target</text>
+      <text x="0" y="368" fill="#f6f1eb">[warn] kubelet restarting pod</text>
     </g>
   </g>
 
-  <g transform="translate(1016 448)">
+  <g transform="translate(1004 430)">
     <path
-      d="M50 0L0 76H30L18 144L92 58H58L50 0Z"
+      d="M58 0L0 88H36L22 170L106 68H66L58 0Z"
       fill="url(#accent)"
-      fill-opacity="0.82"
+      fill-opacity="0.84"
       filter="url(#softGlow)"
     />
     <path
-      d="M50 0L0 76H30L18 144L92 58H58L50 0Z"
+      d="M58 0L0 88H36L22 170L106 68H66L58 0Z"
       fill="url(#accent)"
-      stroke="#ffe7af"
+      stroke="#fff0c1"
       stroke-width="3"
       stroke-linejoin="round"
     />
