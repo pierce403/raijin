@@ -75,6 +75,9 @@ npx wrangler deploy --dry-run
 - To disable the hard max lifetime, set `maxLifetimeSeconds: null` in browser session metadata.
   `src/session-do.js` treats missing/non-positive `maxLifetimeSeconds` as unlimited while still enforcing idle timeout expiry.
 
+- In this Codex sandbox, git network operations may be blocked (`ssh ... port 22: Network is unreachable` and HTTPS CONNECT 403).
+  If conflict resolution requires syncing with GitHub, perform fetch/rebase/merge from an environment with outbound GitHub access.
+
 ## Remote Bootstrap Notes
 
 - The bootstrap uses Python 3 stdlib only.
