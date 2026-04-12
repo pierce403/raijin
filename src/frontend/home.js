@@ -1,5 +1,6 @@
 import "./styles.css";
 import {
+  buildSessionTranscriptText,
   deleteLocalSessionRecord,
   encodeSessionFragment,
   listSessionHistory,
@@ -22,6 +23,21 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 let sessionHistory = [];
+
+function triggerTranscriptDownload(entry) {
+  const transcriptText = buildSessionTranscriptText(entry, entry.transcript);
+  const blob = new Blob([transcriptText], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `raijin-${entry.sessionId}-transcript.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+}
 
 function setError(message) {
   if (!message) {
@@ -145,6 +161,15 @@ function createHistoryCard(entry) {
     link.textContent = "Open Session";
     actions.append(link);
   }
+
+  const downloadButton = document.createElement("button");
+  downloadButton.className = "secondary-button session-history-button";
+  downloadButton.type = "button";
+  downloadButton.textContent = "Download Transcript";
+  downloadButton.addEventListener("click", () => {
+    triggerTranscriptDownload(entry);
+  });
+  actions.append(downloadButton);
 
   const deleteButton = document.createElement("button");
   deleteButton.className = "danger-button session-history-button";

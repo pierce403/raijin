@@ -5,10 +5,12 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import {
   appendSessionTranscript,
+  buildSessionTranscriptText,
   buildBootstrapCommand,
   decodeSessionFragment,
   deleteSession,
   loadSession,
+  loadSessionTranscript,
   saveSession,
   sha256Base64Url,
   upsertSessionHistory,
@@ -22,7 +24,7 @@ const remoteIpNode = document.querySelector("#remote-ip");
 const bootstrapOverlay = document.querySelector("#bootstrap-overlay");
 const bootstrapNode = document.querySelector("#bootstrap-command");
 const copyButton = document.querySelector("#copy-command");
-const selectTextButton = document.querySelector("#select-text");
+const downloadTranscriptButton = document.querySelector("#download-transcript");
 const endButton = document.querySelector("#end-session");
 const errorNode = document.querySelector("#session-error");
 const terminalStage = document.querySelector(".terminal-stage");
@@ -46,7 +48,6 @@ const terminal = new Terminal({
   cursorStyle: "block",
   fontFamily: '"IBM Plex Mono", "SFMono-Regular", monospace',
   fontSize: 14,
-  screenReaderMode: true,
   scrollback: 5000,
   theme: {
     background: "#050505",
@@ -98,7 +99,6 @@ let sessionInfo;
 let ended = false;
 let inputDisposable;
 let currentStatus = "waiting_for_browser";
-let selectionMode = false;
 let txBytes = 0;
 let rxBytes = 0;
 let flashTimer;
@@ -242,28 +242,13 @@ function playConnectionFlash() {
 }
 
 function requestTerminalFocus() {
-  if (currentStatus !== "connected" || selectionMode) {
+  if (currentStatus !== "connected") {
     return;
   }
 
   window.requestAnimationFrame(() => {
     terminal.focus();
   });
-}
-
-function setSelectionMode(enabled) {
-  selectionMode = Boolean(enabled);
-  terminalContainer.classList.toggle("selection-mode", selectionMode);
-  selectTextButton.setAttribute("aria-pressed", String(selectionMode));
-  selectTextButton.textContent = selectionMode ? "Resume Input" : "Select Text";
-
-  if (selectionMode) {
-    terminal.blur();
-    setError("");
-    return;
-  }
-
-  requestTerminalFocus();
 }
 
 function updateLayoutForStatus(status) {
@@ -472,6 +457,30 @@ async function pasteFromClipboard() {
   }
 }
 
+function downloadTranscript() {
+  flushTranscriptBuffers();
+
+  const transcript = loadSessionTranscript(sessionId);
+  const transcriptText = buildSessionTranscriptText({
+    ...sessionInfo,
+    sessionId,
+    lastStatus: currentStatus,
+    remoteIp: remoteIpNode.textContent === "pending" ? "" : remoteIpNode.textContent,
+    lastSeenAt: Date.now(),
+  }, transcript);
+  const blob = new Blob([transcriptText], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `raijin-${sessionId}-transcript.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
 function handleTerminalPaste(event) {
   if (currentStatus !== "connected" || sessionInfo?.readonly) {
     return;
@@ -602,8 +611,8 @@ copyButton.addEventListener("click", async () => {
   }
 });
 
-selectTextButton.addEventListener("click", () => {
-  setSelectionMode(!selectionMode);
+downloadTranscriptButton.addEventListener("click", () => {
+  downloadTranscript();
 });
 
 endButton.addEventListener("click", async () => {
@@ -639,13 +648,6 @@ window.addEventListener("resize", () => {
 
 window.addEventListener("focus", () => {
   requestTerminalFocus();
-});
-
-window.addEventListener("keydown", (event) => {
-  if (selectionMode && event.key === "Escape") {
-    event.preventDefault();
-    setSelectionMode(false);
-  }
 });
 
 window.addEventListener("beforeunload", () => {

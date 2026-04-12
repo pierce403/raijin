@@ -2,7 +2,7 @@ const STORAGE_PREFIX = "raijin:session:";
 const HISTORY_KEY = "raijin:session-history";
 const TRANSCRIPT_PREFIX = "raijin:session-log:";
 const MAX_HISTORY_ENTRIES = 200;
-const MAX_TRANSCRIPT_CHARS = 8_192;
+const MAX_TRANSCRIPT_CHARS = 65_536;
 const ANSI_ESCAPE_PATTERN = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/gu;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B-\u001F\u007F]/gu;
 
@@ -87,6 +87,19 @@ function normalizeSearchText(value) {
     .replace(/\s+/gu, " ")
     .trim()
     .toLowerCase();
+}
+
+function formatTranscriptTimestamp(value) {
+  const timestamp = normalizeTimestamp(value, 0);
+  if (!timestamp) {
+    return "unknown";
+  }
+
+  try {
+    return new Date(timestamp).toISOString();
+  } catch {
+    return "unknown";
+  }
 }
 
 function normalizeHistoryEntry(record, existing = {}) {
@@ -345,6 +358,30 @@ export function listSessionHistory() {
         transcript,
       };
     });
+}
+
+export function buildSessionTranscriptText(session, transcript = null) {
+  const normalizedTranscript = transcript
+    ? normalizeTranscriptRecord(transcript)
+    : loadSessionTranscript(session?.sessionId);
+  const lines = [
+    "raijin.sh transcript",
+    `session: ${session?.sessionId || "unknown"}`,
+    `mode: ${session?.readonly ? "readonly" : (session?.mode || "interactive")}`,
+    `status: ${session?.lastStatus || "unknown"}`,
+    `remote_ip: ${session?.remoteIp || "unknown"}`,
+    `created_at: ${formatTranscriptTimestamp(session?.createdAt)}`,
+    `last_seen_at: ${formatTranscriptTimestamp(session?.lastSeenAt)}`,
+    "",
+    "--- tx ---",
+    normalizedTranscript.tx || "[empty]",
+    "",
+    "--- rx ---",
+    normalizedTranscript.rx || "[empty]",
+    "",
+  ];
+
+  return lines.join("\n");
 }
 
 export function buildBootstrapCommand(session, origin) {

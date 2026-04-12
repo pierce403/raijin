@@ -79,9 +79,9 @@ npx wrangler deploy --dry-run
   Fix:
   xterm already focuses itself on terminal `mousedown`. An extra pointerdown refocus can interrupt drag selection and make text highlighting look broken. Keep focus restoration on connect/window focus only.
 
-- Plain drag selection can still be blocked when the remote app enables mouse reporting.
+- Do not rely on xterm screen-reader mode as a text-selection workaround.
   Fix:
-  `src/frontend/session.js` now exposes a dedicated `Select Text` mode that blurs terminal input and uses xterm's screen-reader accessibility layer for browser-native drag selection. `session.html` and `src/frontend/styles.css` must keep that mode wired so copying works even when xterm's internal selection service is disabled by mouse-capture apps.
+  The attempted `Select Text` mode was not reliable enough in practice. Prefer transcript export instead: `session.html`, `src/frontend/session.js`, and `src/frontend/home.js` now expose `Download Transcript` actions backed by local tx/rx logs.
 
 - The connected cursor is easy to lose if the terminal briefly drops focus.
   Fix:
@@ -93,7 +93,7 @@ npx wrangler deploy --dry-run
 
 - Session transcript search now comes from separate localStorage records at `raijin:session-log:<sessionId>`.
   Fix:
-  Append tx/rx text from `src/frontend/session.js` on a short debounce instead of writing to localStorage on every packet, and cap each direction to the most recent 8192 characters in `src/frontend/session-store.js` so transcript search stays useful without exhausting browser storage.
+  Append tx/rx text from `src/frontend/session.js` on a short debounce instead of writing to localStorage on every packet, and cap each direction to the most recent 65536 characters in `src/frontend/session-store.js` so transcript search and transcript download stay useful without exhausting browser storage.
 
 - Only show "Open Session" on the landing-page history list when `hasLocalSession` is true.
   Fix:
