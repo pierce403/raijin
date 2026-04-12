@@ -761,6 +761,19 @@ a {
   padding: 14px;
 }
 
+.terminal-panel.selection-mode .xterm {
+  cursor: text;
+}
+
+.terminal-panel.selection-mode .xterm .xterm-accessibility:not(.debug) {
+  pointer-events: auto;
+}
+
+.terminal-panel.selection-mode .xterm .xterm-accessibility-tree:not(.debug) *::selection {
+  background: rgba(255, 171, 77, 0.38);
+  color: transparent;
+}
+
 .page-session {
   overflow-x: hidden;
   overflow-y: auto;

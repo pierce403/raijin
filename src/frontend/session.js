@@ -22,6 +22,7 @@ const remoteIpNode = document.querySelector("#remote-ip");
 const bootstrapOverlay = document.querySelector("#bootstrap-overlay");
 const bootstrapNode = document.querySelector("#bootstrap-command");
 const copyButton = document.querySelector("#copy-command");
+const selectTextButton = document.querySelector("#select-text");
 const endButton = document.querySelector("#end-session");
 const errorNode = document.querySelector("#session-error");
 const terminalStage = document.querySelector(".terminal-stage");
@@ -45,6 +46,7 @@ const terminal = new Terminal({
   cursorStyle: "block",
   fontFamily: '"IBM Plex Mono", "SFMono-Regular", monospace',
   fontSize: 14,
+  screenReaderMode: true,
   scrollback: 5000,
   theme: {
     background: "#050505",
@@ -96,6 +98,7 @@ let sessionInfo;
 let ended = false;
 let inputDisposable;
 let currentStatus = "waiting_for_browser";
+let selectionMode = false;
 let txBytes = 0;
 let rxBytes = 0;
 let flashTimer;
@@ -239,13 +242,28 @@ function playConnectionFlash() {
 }
 
 function requestTerminalFocus() {
-  if (currentStatus !== "connected") {
+  if (currentStatus !== "connected" || selectionMode) {
     return;
   }
 
   window.requestAnimationFrame(() => {
     terminal.focus();
   });
+}
+
+function setSelectionMode(enabled) {
+  selectionMode = Boolean(enabled);
+  terminalContainer.classList.toggle("selection-mode", selectionMode);
+  selectTextButton.setAttribute("aria-pressed", String(selectionMode));
+  selectTextButton.textContent = selectionMode ? "Resume Input" : "Select Text";
+
+  if (selectionMode) {
+    terminal.blur();
+    setError("");
+    return;
+  }
+
+  requestTerminalFocus();
 }
 
 function updateLayoutForStatus(status) {
@@ -584,6 +602,10 @@ copyButton.addEventListener("click", async () => {
   }
 });
 
+selectTextButton.addEventListener("click", () => {
+  setSelectionMode(!selectionMode);
+});
+
 endButton.addEventListener("click", async () => {
   endButton.disabled = true;
   try {
@@ -617,6 +639,13 @@ window.addEventListener("resize", () => {
 
 window.addEventListener("focus", () => {
   requestTerminalFocus();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (selectionMode && event.key === "Escape") {
+    event.preventDefault();
+    setSelectionMode(false);
+  }
 });
 
 window.addEventListener("beforeunload", () => {

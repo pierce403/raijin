@@ -79,6 +79,10 @@ npx wrangler deploy --dry-run
   Fix:
   xterm already focuses itself on terminal `mousedown`. An extra pointerdown refocus can interrupt drag selection and make text highlighting look broken. Keep focus restoration on connect/window focus only.
 
+- Plain drag selection can still be blocked when the remote app enables mouse reporting.
+  Fix:
+  `src/frontend/session.js` now exposes a dedicated `Select Text` mode that blurs terminal input and uses xterm's screen-reader accessibility layer for browser-native drag selection. `session.html` and `src/frontend/styles.css` must keep that mode wired so copying works even when xterm's internal selection service is disabled by mouse-capture apps.
+
 - The connected cursor is easy to lose if the terminal briefly drops focus.
   Fix:
   Keep the xterm cursor visible with `cursorStyle: "block"` and `cursorInactiveStyle: "outline"`, and refocus the terminal on connect/window focus rather than adding more UI chrome.
