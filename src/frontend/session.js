@@ -82,6 +82,12 @@ terminal.attachCustomKeyEventHandler((event) => {
     return false;
   }
 
+  if (shouldPasteFromClipboard(event)) {
+    event.preventDefault();
+    void pasteFromClipboard();
+    return false;
+  }
+
   return true;
 });
 
@@ -354,11 +360,23 @@ function usesPrimaryModifier(event) {
 }
 
 function shouldCopySelection(event) {
+  const key = event.key.toLowerCase();
+
+  if (!terminal.hasSelection()) {
+    return false;
+  }
+
+  if (key !== "c") {
+    return false;
+  }
+
+  if (isApplePlatform) {
+    return event.metaKey && !event.ctrlKey && !event.altKey;
+  }
+
   return (
-    terminal.hasSelection()
-    && usesPrimaryModifier(event)
-    && !event.altKey
-    && event.key.toLowerCase() === "c"
+    (usesPrimaryModifier(event) && !event.shiftKey && !event.altKey)
+    || (event.ctrlKey && event.shiftKey && !event.altKey)
   );
 }
 
@@ -397,19 +415,43 @@ async function copyTerminalSelection() {
   }
 }
 
-function handleTerminalCopy(event) {
-  if (!terminal.hasSelection()) {
-    return;
+function shouldPasteFromClipboard(event) {
+  if (currentStatus !== "connected" || sessionInfo?.readonly) {
+    return false;
   }
 
-  const selection = terminal.getSelection();
-  if (!selection || !event.clipboardData) {
-    return;
+  if (event.key === "Insert") {
+    return event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey;
   }
 
-  event.clipboardData.setData("text/plain", selection);
-  event.preventDefault();
-  event.stopPropagation();
+  const key = event.key.toLowerCase();
+  if (key !== "v") {
+    return false;
+  }
+
+  if (isApplePlatform) {
+    return event.metaKey && !event.ctrlKey && !event.altKey;
+  }
+
+  return (
+    (event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey)
+    || (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey)
+  );
+}
+
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) {
+      return;
+    }
+
+    setError("");
+    requestTerminalFocus();
+    terminal.paste(text);
+  } catch {
+    setError("Unable to read from clipboard.");
+  }
 }
 
 function handleTerminalPaste(event) {
@@ -528,7 +570,6 @@ async function connectBrowserSocket() {
   });
 }
 
-terminalContainer.addEventListener("copy", handleTerminalCopy, true);
 terminalContainer.addEventListener("paste", handleTerminalPaste, true);
 
 copyButton.addEventListener("click", async () => {

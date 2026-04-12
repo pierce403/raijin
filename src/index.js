@@ -55,7 +55,7 @@ function htmlHeaders(extra = {}) {
     "cache-control": "no-store",
     "content-security-policy": CSP_HEADER,
     "cross-origin-opener-policy": "same-origin",
-    "permissions-policy": "clipboard-write=(self)",
+    "permissions-policy": "clipboard-read=(self), clipboard-write=(self)",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
     ...extra,

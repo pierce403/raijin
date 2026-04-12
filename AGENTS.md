@@ -69,7 +69,11 @@ npx wrangler deploy --dry-run
 
 - xterm clipboard shortcuts need explicit browser-side handling in `src/frontend/session.js`.
   Fix:
-  Treat `Cmd/Ctrl+C` as copy only when `terminal.hasSelection()` is true so interactive `Ctrl+C` still reaches the remote shell, and handle `copy`/`paste` events on `#terminal` to bridge browser clipboard data into the terminal session.
+  Treat `Cmd/Ctrl+C` as copy only when `terminal.hasSelection()` is true so interactive `Ctrl+C` still reaches the remote shell, and explicitly handle keyboard paste shortcuts like `Cmd/Ctrl+V`, `Ctrl+Shift+V`, and `Shift+Insert` because xterm key handling can consume them before the browser paste flow runs.
+
+- Async keyboard paste on the deployed site needs `clipboard-read` in the page `Permissions-Policy`.
+  Fix:
+  `src/index.js` should send `clipboard-read=(self), clipboard-write=(self)` so `navigator.clipboard.readText()` works for terminal paste shortcuts on the session page.
 
 - Do not refocus xterm on `pointerdown` in `src/frontend/session.js`.
   Fix:
