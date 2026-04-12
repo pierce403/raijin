@@ -83,9 +83,17 @@ npx wrangler deploy --dry-run
   Fix:
   Keep archived entries lightweight in `src/frontend/session-store.js` and preserve only searchable fields like `sessionId`, `mode`, `lastStatus`, `remoteIp`, and timestamps. Do not depend on live `raijin:session:*` records for old-session history because `deleteSession()` removes those active metadata blobs.
 
+- Session transcript search now comes from separate localStorage records at `raijin:session-log:<sessionId>`.
+  Fix:
+  Append tx/rx text from `src/frontend/session.js` on a short debounce instead of writing to localStorage on every packet, and cap each direction to the most recent 8192 characters in `src/frontend/session-store.js` so transcript search stays useful without exhausting browser storage.
+
 - Only show "Open Session" on the landing-page history list when `hasLocalSession` is true.
   Fix:
   Archived history entries do not have the per-session browser metadata needed by `src/frontend/session.js`, so linking archived rows straight to `/s/:id` will only produce "Session metadata was not found for this origin."
+
+- A global hourly server-side sweeper would require a persisted registry of session IDs.
+  Fix:
+  Prefer per-session expiry timers plus `clearRuntimeState()` in `src/session-do.js` so ended sessions drop browser/agent tokens and other runtime metadata without introducing a new persisted server-side session index.
 
 - `/bootstrap?c=...` must be included in `assets.run_worker_first` in `wrangler.jsonc`.
   If only `/bootstrap/*` is listed, the asset handler will intercept the request and return a 404.

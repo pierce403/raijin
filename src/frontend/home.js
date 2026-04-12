@@ -1,5 +1,6 @@
 import "./styles.css";
 import {
+  deleteLocalSessionRecord,
   encodeSessionFragment,
   listSessionHistory,
   randomToken,
@@ -69,17 +70,7 @@ function buildSessionSummary(entry) {
 }
 
 function buildSearchText(entry) {
-  return [
-    entry.sessionId,
-    entry.mode,
-    entry.readonly ? "readonly" : "",
-    entry.lastStatus,
-    entry.remoteIp,
-    entry.command,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+  return entry.searchText || "";
 }
 
 function formatTimestamp(value) {
@@ -154,6 +145,21 @@ function createHistoryCard(entry) {
     link.textContent = "Open Session";
     actions.append(link);
   }
+
+  const deleteButton = document.createElement("button");
+  deleteButton.className = "danger-button session-history-button";
+  deleteButton.type = "button";
+  deleteButton.textContent = "Delete Local Copy";
+  deleteButton.addEventListener("click", () => {
+    const confirmed = window.confirm(`Delete local history for session ${entry.sessionId}?`);
+    if (!confirmed) {
+      return;
+    }
+
+    deleteLocalSessionRecord(entry.sessionId);
+    renderSessionHistory();
+  });
+  actions.append(deleteButton);
 
   card.append(header, meta, actions);
   return card;

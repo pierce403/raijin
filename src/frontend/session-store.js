@@ -1,6 +1,11 @@
 const STORAGE_PREFIX = "raijin:session:";
 const HISTORY_KEY = "raijin:session-history";
+const TRANSCRIPT_PREFIX = "raijin:session-log:";
 const MAX_HISTORY_ENTRIES = 200;
+const MAX_TRANSCRIPT_CHARS = 8_192;
+const ANSI_ESCAPE_PATTERN = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/gu;
+const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B-\u001F\u007F]/gu;
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -16,12 +21,25 @@ function parseStoredJson(raw) {
   }
 }
 
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeTimestamp(value, fallback = Date.now()) {
   const candidate = Number(value);
   return Number.isFinite(candidate) && candidate > 0 ? candidate : fallback;
 }
 
 function normalizeTimeout(value, fallback = null) {
+  if (value === null) {
+    return null;
+  }
+
   const candidate = Number(value);
   return Number.isFinite(candidate) && candidate > 0 ? candidate : fallback;
 }
@@ -36,6 +54,39 @@ function normalizeStatus(value, fallback = "waiting_for_browser") {
 
 function sanitizeCommand(value) {
   return typeof value === "string" ? value.slice(0, 240) : "";
+}
+
+function sanitizeTranscriptChunk(value) {
+  return typeof value === "string" ? value.slice(-MAX_TRANSCRIPT_CHARS) : "";
+}
+
+function trimTranscript(value) {
+  const text = sanitizeTranscriptChunk(value);
+  return text.length > MAX_TRANSCRIPT_CHARS ? text.slice(-MAX_TRANSCRIPT_CHARS) : text;
+}
+
+function normalizeTranscriptRecord(record) {
+  if (!record || typeof record !== "object") {
+    return { tx: "", rx: "" };
+  }
+
+  return {
+    tx: trimTranscript(record.tx),
+    rx: trimTranscript(record.rx),
+  };
+}
+
+function normalizeSearchText(value) {
+  if (typeof value !== "string" || !value) {
+    return "";
+  }
+
+  return value
+    .replaceAll(ANSI_ESCAPE_PATTERN, " ")
+    .replaceAll(CONTROL_CHAR_PATTERN, " ")
+    .replace(/\s+/gu, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function normalizeHistoryEntry(record, existing = {}) {
@@ -88,7 +139,7 @@ function readHistoryEntries() {
 }
 
 function writeHistoryEntries(entries) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY_ENTRIES)));
+  safeSetItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY_ENTRIES)));
 }
 
 function listStoredSessions() {
@@ -150,8 +201,12 @@ export function sessionStorageKey(sessionId) {
   return `${STORAGE_PREFIX}${sessionId}`;
 }
 
+export function transcriptStorageKey(sessionId) {
+  return `${TRANSCRIPT_PREFIX}${sessionId}`;
+}
+
 export function saveSession(session) {
-  localStorage.setItem(sessionStorageKey(session.sessionId), JSON.stringify(session));
+  safeSetItem(sessionStorageKey(session.sessionId), JSON.stringify(session));
   upsertSessionHistory({
     ...session,
     hasLocalSession: true,
@@ -163,6 +218,44 @@ export function loadSession(sessionId) {
   return parseStoredJson(localStorage.getItem(sessionStorageKey(sessionId)));
 }
 
+export function loadSessionTranscript(sessionId) {
+  if (!sessionId) {
+    return { tx: "", rx: "" };
+  }
+
+  return normalizeTranscriptRecord(parseStoredJson(localStorage.getItem(transcriptStorageKey(sessionId))));
+}
+
+export function writeSessionTranscript(sessionId, transcript) {
+  if (!sessionId) {
+    return { tx: "", rx: "" };
+  }
+
+  const normalized = normalizeTranscriptRecord(transcript);
+  if (!normalized.tx && !normalized.rx) {
+    localStorage.removeItem(transcriptStorageKey(sessionId));
+    return normalized;
+  }
+
+  safeSetItem(transcriptStorageKey(sessionId), JSON.stringify(normalized));
+  return normalized;
+}
+
+export function appendSessionTranscript(sessionId, direction, chunk) {
+  if (!sessionId || !["tx", "rx"].includes(direction)) {
+    return { tx: "", rx: "" };
+  }
+
+  const text = sanitizeTranscriptChunk(chunk);
+  if (!text) {
+    return loadSessionTranscript(sessionId);
+  }
+
+  const transcript = loadSessionTranscript(sessionId);
+  transcript[direction] = trimTranscript(transcript[direction] + text);
+  return writeSessionTranscript(sessionId, transcript);
+}
+
 export function deleteSession(sessionId) {
   const existing = loadSession(sessionId);
   upsertSessionHistory({
@@ -172,6 +265,18 @@ export function deleteSession(sessionId) {
     lastSeenAt: Date.now(),
   });
   localStorage.removeItem(sessionStorageKey(sessionId));
+}
+
+export function deleteLocalSessionRecord(sessionId) {
+  if (!sessionId) {
+    return;
+  }
+
+  const entries = readHistoryEntries()
+    .filter((entry) => entry.sessionId !== sessionId);
+  writeHistoryEntries(entries);
+  localStorage.removeItem(sessionStorageKey(sessionId));
+  localStorage.removeItem(transcriptStorageKey(sessionId));
 }
 
 export function upsertSessionHistory(record) {
@@ -218,7 +323,28 @@ export function listSessionHistory() {
   }
 
   return Array.from(merged.values())
-    .sort((left, right) => right.lastSeenAt - left.lastSeenAt);
+    .sort((left, right) => right.lastSeenAt - left.lastSeenAt)
+    .map((entry) => {
+      const transcript = loadSessionTranscript(entry.sessionId);
+      const searchText = [
+        entry.sessionId,
+        entry.mode,
+        entry.readonly ? "readonly" : "",
+        entry.lastStatus,
+        entry.remoteIp,
+        entry.command,
+        normalizeSearchText(transcript.tx),
+        normalizeSearchText(transcript.rx),
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      return {
+        ...entry,
+        searchText,
+        transcript,
+      };
+    });
 }
 
 export function buildBootstrapCommand(session, origin) {

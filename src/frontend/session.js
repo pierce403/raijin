@@ -4,6 +4,7 @@ import "./styles.css";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import {
+  appendSessionTranscript,
   buildBootstrapCommand,
   decodeSessionFragment,
   deleteSession,
@@ -32,8 +33,10 @@ const rxCountNode = document.querySelector("#rx-count");
 
 const sessionId = window.location.pathname.split("/").filter(Boolean).at(-1);
 const encoder = new TextEncoder();
+const outputDecoder = new TextDecoder();
 const platform = navigator.userAgentData?.platform || navigator.platform || "";
 const isApplePlatform = /mac|iphone|ipad/i.test(platform);
+const TRANSCRIPT_FLUSH_DELAY_MS = 400;
 
 const terminal = new Terminal({
   allowTransparency: false,
@@ -90,9 +93,12 @@ let currentStatus = "waiting_for_browser";
 let txBytes = 0;
 let rxBytes = 0;
 let flashTimer;
+let transcriptFlushTimer;
+const transcriptBuffers = { tx: "", rx: "" };
 const trafficTimers = new WeakMap();
 
 function clearLocalSession() {
+  flushTranscriptBuffers();
   deleteSession(sessionId);
 }
 
@@ -160,6 +166,44 @@ function recordTraffic(direction, size) {
   rxBytes += size;
   renderTraffic();
   pulseIndicator(rxIndicator);
+}
+
+function flushTranscriptBuffers() {
+  if (transcriptFlushTimer) {
+    window.clearTimeout(transcriptFlushTimer);
+    transcriptFlushTimer = undefined;
+  }
+
+  if (!sessionInfo?.sessionId) {
+    transcriptBuffers.tx = "";
+    transcriptBuffers.rx = "";
+    return;
+  }
+
+  if (transcriptBuffers.tx) {
+    appendSessionTranscript(sessionInfo.sessionId, "tx", transcriptBuffers.tx);
+    transcriptBuffers.tx = "";
+  }
+
+  if (transcriptBuffers.rx) {
+    appendSessionTranscript(sessionInfo.sessionId, "rx", transcriptBuffers.rx);
+    transcriptBuffers.rx = "";
+  }
+}
+
+function scheduleTranscriptAppend(direction, text) {
+  if (!sessionInfo?.sessionId || !text || !["tx", "rx"].includes(direction)) {
+    return;
+  }
+
+  transcriptBuffers[direction] += text;
+  if (transcriptFlushTimer) {
+    return;
+  }
+
+  transcriptFlushTimer = window.setTimeout(() => {
+    flushTranscriptBuffers();
+  }, TRANSCRIPT_FLUSH_DELAY_MS);
 }
 
 function setRemoteIp(remoteIp) {
@@ -290,6 +334,10 @@ function loadSessionFromFragment() {
 function sendMessage(message) {
   if (!websocket || websocket.readyState !== WebSocket.OPEN || ended) {
     return;
+  }
+
+  if (message.type === "stdin" && typeof message.data === "string") {
+    scheduleTranscriptAppend("tx", message.data);
   }
 
   const payload = JSON.stringify(message);
@@ -428,11 +476,14 @@ function handleSocketMessage(event) {
   }
 
   if (message.type === "output" && message.data) {
-    terminal.write(decodeBase64ToBytes(message.data));
+    const bytes = decodeBase64ToBytes(message.data);
+    terminal.write(bytes);
+    scheduleTranscriptAppend("rx", outputDecoder.decode(bytes, { stream: true }));
     return;
   }
 
   if (message.type === "notice" && message.message) {
+    scheduleTranscriptAppend("rx", `[raijin] ${message.message}\n`);
     safeWriteLine(`[raijin] ${message.message}`);
   }
 }
@@ -528,6 +579,7 @@ window.addEventListener("focus", () => {
 });
 
 window.addEventListener("beforeunload", () => {
+  flushTranscriptBuffers();
   if (websocket && websocket.readyState === WebSocket.OPEN) {
     websocket.close(1000, "page unload");
   }

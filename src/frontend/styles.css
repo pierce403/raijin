@@ -291,6 +291,10 @@ a {
   width: max-content;
 }
 
+.session-history-button {
+  width: max-content;
+}
+
 .github-link {
   display: inline-flex;
   align-items: center;
@@ -923,6 +927,10 @@ a {
   }
 
   .session-history-link {
+    width: 100%;
+  }
+
+  .session-history-button {
     width: 100%;
   }
 

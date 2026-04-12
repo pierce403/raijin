@@ -2,6 +2,7 @@ const WAIT_TIMEOUT_MS = 25_000;
 const DEFAULT_IDLE_TIMEOUT_MS = 600_000;
 const MIN_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 7_200_000;
+const MAX_SWEEP_INTERVAL_MS = 3_600_000;
 
 const encoder = new TextEncoder();
 
@@ -84,6 +85,7 @@ export class SessionDurableObject {
     this.waiters = [];
     this.status = "waiting_for_browser";
     this.endedAt = null;
+    this.expiryTimer = null;
   }
 
   async fetch(request) {
@@ -143,7 +145,55 @@ export class SessionDurableObject {
 
     if ((maxDeadline !== null && now >= maxDeadline) || now >= idleDeadline) {
       await this.endSession("expired", { closeBrowser: true });
+      return;
     }
+
+    this.scheduleExpiryCheck();
+  }
+
+  clearExpiryTimer() {
+    if (this.expiryTimer) {
+      clearTimeout(this.expiryTimer);
+      this.expiryTimer = null;
+    }
+  }
+
+  scheduleExpiryCheck() {
+    this.clearExpiryTimer();
+    if (!this.initialized || this.endedAt) {
+      return;
+    }
+
+    const now = Date.now();
+    const maxDeadline = Number.isFinite(this.maxLifetimeMs) ? this.createdAt + this.maxLifetimeMs : null;
+    const idleDeadline = this.lastActivityAt + this.idleTimeoutMs;
+    const nextDeadline = maxDeadline === null
+      ? idleDeadline
+      : Math.min(maxDeadline, idleDeadline);
+    const delay = Math.max(0, Math.min(nextDeadline - now, MAX_SWEEP_INTERVAL_MS));
+
+    this.expiryTimer = setTimeout(() => {
+      this.expiryTimer = null;
+      void this.checkExpiry();
+    }, delay);
+  }
+
+  clearRuntimeState() {
+    this.clearExpiryTimer();
+    this.browserSocket = null;
+    this.browserTokenHash = null;
+    this.agentTokenHash = null;
+    this.mode = "interactive";
+    this.command = "";
+    this.readonly = false;
+    this.createdAt = 0;
+    this.idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS;
+    this.maxLifetimeMs = null;
+    this.initialized = false;
+    this.agentConnectedAt = null;
+    this.agentIp = null;
+    this.lastActivityAt = 0;
+    this.pendingEvents = [];
   }
 
   async handleBrowserConnect(request) {
@@ -303,6 +353,10 @@ export class SessionDurableObject {
   }
 
   async handleExplicitEnd(request) {
+    if (this.endedAt) {
+      return jsonResponse({ ok: true, status: this.status });
+    }
+
     if (!this.browserTokenHash) {
       return jsonResponse({ error: "Session not initialized." }, { status: 404 });
     }
@@ -317,6 +371,10 @@ export class SessionDurableObject {
   }
 
   async authenticateAgentRequest(request) {
+    if (this.endedAt) {
+      return { ok: false, response: jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 }) };
+    }
+
     if (!this.initialized || !this.agentTokenHash) {
       return { ok: false, response: jsonResponse({ error: "Browser has not initialized this session yet." }, { status: 409 }) };
     }
@@ -435,6 +493,7 @@ export class SessionDurableObject {
 
   touchActivity() {
     this.lastActivityAt = Date.now();
+    this.scheduleExpiryCheck();
   }
 
   queueEvent(event) {
@@ -526,5 +585,7 @@ export class SessionDurableObject {
         this.browserSocket.close(1000, reason);
       }
     }
+
+    this.clearRuntimeState();
   }
 }
