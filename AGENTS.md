@@ -75,6 +75,14 @@ npx wrangler deploy --dry-run
   Fix:
   Keep the xterm cursor visible with `cursorStyle: "block"` and `cursorInactiveStyle: "outline"`, and refocus the terminal on connect/window focus rather than adding more UI chrome.
 
+- Landing page session history now lives in the separate localStorage key `raijin:session-history`.
+  Fix:
+  Keep archived entries lightweight in `src/frontend/session-store.js` and preserve only searchable fields like `sessionId`, `mode`, `lastStatus`, `remoteIp`, and timestamps. Do not depend on live `raijin:session:*` records for old-session history because `deleteSession()` removes those active metadata blobs.
+
+- Only show "Open Session" on the landing-page history list when `hasLocalSession` is true.
+  Fix:
+  Archived history entries do not have the per-session browser metadata needed by `src/frontend/session.js`, so linking archived rows straight to `/s/:id` will only produce "Session metadata was not found for this origin."
+
 - `/bootstrap?c=...` must be included in `assets.run_worker_first` in `wrangler.jsonc`.
   If only `/bootstrap/*` is listed, the asset handler will intercept the request and return a 404.
 

@@ -188,6 +188,109 @@ a {
   min-width: 180px;
 }
 
+.page-home.has-session-history .shell-layout {
+  align-content: start;
+}
+
+.session-history-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.session-history-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.session-history-count,
+.session-search-field span,
+.session-history-empty {
+  color: var(--text-soft);
+}
+
+.session-history-count,
+.session-history-empty {
+  margin: 0;
+}
+
+.session-search-field {
+  display: grid;
+  gap: 8px;
+}
+
+.session-search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 14px 16px;
+}
+
+.session-history-list {
+  display: grid;
+  gap: 12px;
+}
+
+.session-history-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: rgba(10, 10, 10, 0.72);
+}
+
+.session-history-card-header,
+.session-history-actions {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-history-card-title {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-history-card-title code {
+  font-size: 0.96rem;
+  overflow-wrap: anywhere;
+}
+
+.session-history-summary {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.session-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.session-history-meta span,
+.session-history-flag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 171, 77, 0.18);
+  background: rgba(255, 171, 77, 0.08);
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+.session-history-link {
+  width: max-content;
+}
+
 .github-link {
   display: inline-flex;
   align-items: center;
@@ -796,6 +899,9 @@ a {
     align-items: flex-start;
   }
 
+  .session-history-header,
+  .session-history-card-header,
+  .session-history-actions,
   .submit-row,
   .action-row,
   .status-row,
@@ -814,6 +920,10 @@ a {
 
   .fact-card-traffic {
     grid-column: auto;
+  }
+
+  .session-history-link {
+    width: 100%;
   }
 
   .status-copy {

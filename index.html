@@ -78,6 +78,35 @@
         <p id="home-error" class="form-error" hidden></p>
       </section>
 
+      <section id="session-history-panel" class="panel session-history-panel" hidden>
+        <div class="panel-header session-history-header">
+          <div>
+            <p class="eyebrow">Local History</p>
+            <h2>Recent Sessions</h2>
+            <p class="lede compact">
+              Search sessions stored in this browser.
+            </p>
+          </div>
+          <p id="session-history-count" class="session-history-count" hidden></p>
+        </div>
+
+        <label class="session-search-field" for="session-search">
+          <span>Search</span>
+          <input
+            id="session-search"
+            class="session-search-input"
+            type="search"
+            placeholder="Session id, status, mode, command, IP"
+            spellcheck="false"
+          />
+        </label>
+
+        <div id="session-history-list" class="session-history-list"></div>
+        <p id="session-history-empty" class="session-history-empty" hidden>
+          No sessions match this search.
+        </p>
+      </section>
+
     </main>
   </body>
 </html>

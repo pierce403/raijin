@@ -10,6 +10,7 @@ import {
   loadSession,
   saveSession,
   sha256Base64Url,
+  upsertSessionHistory,
 } from "./session-store.js";
 
 const statusBadge = document.querySelector("#status-badge");
@@ -161,6 +162,14 @@ function recordTraffic(direction, size) {
 
 function setRemoteIp(remoteIp) {
   remoteIpNode.textContent = remoteIp || "pending";
+
+  if (sessionInfo?.sessionId && remoteIp) {
+    upsertSessionHistory({
+      sessionId,
+      remoteIp,
+      lastSeenAt: Date.now(),
+    });
+  }
 }
 
 function playConnectionFlash() {
@@ -232,6 +241,13 @@ function setStatus(status) {
   const statusText = copyMap[normalized] ?? label;
   statusCopy.textContent = statusText;
   statusCopy.hidden = statusText.length === 0;
+  if (sessionInfo?.sessionId) {
+    upsertSessionHistory({
+      sessionId,
+      lastStatus: normalized,
+      lastSeenAt: Date.now(),
+    });
+  }
   updateLayoutForStatus(normalized);
 
   if (previousStatus !== "connected" && normalized === "connected") {
@@ -527,6 +543,11 @@ async function init() {
 
     sessionIdNode.textContent = sessionInfo.sessionId;
     modeLabel.textContent = sessionInfo.mode;
+    upsertSessionHistory({
+      ...sessionInfo,
+      hasLocalSession: true,
+      lastSeenAt: Date.now(),
+    });
     setRemoteIp("");
     bootstrapNode.value = buildBootstrapCommand(sessionInfo, window.location.origin);
     renderTraffic();

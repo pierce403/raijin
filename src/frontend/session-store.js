@@ -1,6 +1,115 @@
 const STORAGE_PREFIX = "raijin:session:";
+const HISTORY_KEY = "raijin:session-history";
+const MAX_HISTORY_ENTRIES = 200;
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+function parseStoredJson(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTimestamp(value, fallback = Date.now()) {
+  const candidate = Number(value);
+  return Number.isFinite(candidate) && candidate > 0 ? candidate : fallback;
+}
+
+function normalizeTimeout(value, fallback = null) {
+  const candidate = Number(value);
+  return Number.isFinite(candidate) && candidate > 0 ? candidate : fallback;
+}
+
+function normalizeMode(value, fallback = "interactive") {
+  return ["interactive", "command", "readonly"].includes(value) ? value : fallback;
+}
+
+function normalizeStatus(value, fallback = "waiting_for_browser") {
+  return typeof value === "string" && value ? value : fallback;
+}
+
+function sanitizeCommand(value) {
+  return typeof value === "string" ? value.slice(0, 240) : "";
+}
+
+function normalizeHistoryEntry(record, existing = {}) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const sessionId = typeof record.sessionId === "string"
+    ? record.sessionId
+    : existing.sessionId;
+
+  if (!sessionId) {
+    return null;
+  }
+
+  const createdAt = normalizeTimestamp(record.createdAt, existing.createdAt ?? Date.now());
+  const maxLifetimeSeconds = record.maxLifetimeSeconds === null
+    ? null
+    : normalizeTimeout(record.maxLifetimeSeconds, existing.maxLifetimeSeconds ?? null);
+
+  return {
+    sessionId,
+    createdAt,
+    lastSeenAt: normalizeTimestamp(record.lastSeenAt, existing.lastSeenAt ?? createdAt),
+    mode: normalizeMode(record.mode, existing.mode ?? "interactive"),
+    command: sanitizeCommand(record.command ?? existing.command ?? ""),
+    readonly: typeof record.readonly === "boolean" ? record.readonly : Boolean(existing.readonly),
+    idleTimeoutSeconds: normalizeTimeout(
+      record.idleTimeoutSeconds,
+      existing.idleTimeoutSeconds ?? null,
+    ),
+    maxLifetimeSeconds,
+    lastStatus: normalizeStatus(record.lastStatus ?? record.status, existing.lastStatus),
+    remoteIp: typeof record.remoteIp === "string" ? record.remoteIp : (existing.remoteIp ?? ""),
+    hasLocalSession: typeof record.hasLocalSession === "boolean"
+      ? record.hasLocalSession
+      : Boolean(existing.hasLocalSession),
+  };
+}
+
+function readHistoryEntries() {
+  const parsed = parseStoredJson(localStorage.getItem(HISTORY_KEY));
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .map((entry) => normalizeHistoryEntry(entry))
+    .filter(Boolean);
+}
+
+function writeHistoryEntries(entries) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_HISTORY_ENTRIES)));
+}
+
+function listStoredSessions() {
+  const sessions = [];
+
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(STORAGE_PREFIX)) {
+      continue;
+    }
+
+    const session = parseStoredJson(localStorage.getItem(key));
+    if (!session || typeof session !== "object" || typeof session.sessionId !== "string") {
+      continue;
+    }
+
+    sessions.push(session);
+  }
+
+  return sessions;
+}
 
 export function encodeBase64Url(bytes) {
   let binary = "";
@@ -43,23 +152,73 @@ export function sessionStorageKey(sessionId) {
 
 export function saveSession(session) {
   localStorage.setItem(sessionStorageKey(session.sessionId), JSON.stringify(session));
+  upsertSessionHistory({
+    ...session,
+    hasLocalSession: true,
+    lastSeenAt: Date.now(),
+  });
 }
 
 export function loadSession(sessionId) {
-  const raw = localStorage.getItem(sessionStorageKey(sessionId));
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return parseStoredJson(localStorage.getItem(sessionStorageKey(sessionId)));
 }
 
 export function deleteSession(sessionId) {
+  const existing = loadSession(sessionId);
+  upsertSessionHistory({
+    ...(existing || {}),
+    sessionId,
+    hasLocalSession: false,
+    lastSeenAt: Date.now(),
+  });
   localStorage.removeItem(sessionStorageKey(sessionId));
+}
+
+export function upsertSessionHistory(record) {
+  const entries = readHistoryEntries();
+  const index = entries.findIndex((entry) => entry.sessionId === record?.sessionId);
+  const existing = index >= 0 ? entries[index] : {};
+  const normalized = normalizeHistoryEntry(record, existing);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (index >= 0) {
+    entries[index] = normalized;
+  } else {
+    entries.push(normalized);
+  }
+
+  entries.sort((left, right) => right.lastSeenAt - left.lastSeenAt);
+  writeHistoryEntries(entries);
+  return normalized;
+}
+
+export function listSessionHistory() {
+  const merged = new Map();
+
+  for (const entry of readHistoryEntries()) {
+    merged.set(entry.sessionId, entry);
+  }
+
+  for (const session of listStoredSessions()) {
+    const existing = merged.get(session.sessionId);
+    const normalized = normalizeHistoryEntry({
+      ...session,
+      hasLocalSession: true,
+      lastSeenAt: existing?.lastSeenAt ?? session.createdAt ?? Date.now(),
+      lastStatus: existing?.lastStatus ?? "waiting_for_browser",
+      remoteIp: existing?.remoteIp ?? "",
+    }, existing ?? {});
+
+    if (normalized) {
+      merged.set(normalized.sessionId, normalized);
+    }
+  }
+
+  return Array.from(merged.values())
+    .sort((left, right) => right.lastSeenAt - left.lastSeenAt);
 }
 
 export function buildBootstrapCommand(session, origin) {
