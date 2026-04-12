@@ -67,6 +67,14 @@ npx wrangler deploy --dry-run
   Fix:
   Pass the newly created session bundle in the URL fragment during navigation, then rehydrate and resave it on the final origin in `src/frontend/session.js`.
 
+- xterm clipboard shortcuts need explicit browser-side handling in `src/frontend/session.js`.
+  Fix:
+  Treat `Cmd/Ctrl+C` as copy only when `terminal.hasSelection()` is true so interactive `Ctrl+C` still reaches the remote shell, and handle `copy`/`paste` events on `#terminal` to bridge browser clipboard data into the terminal session.
+
+- The connected cursor is easy to lose if the terminal briefly drops focus.
+  Fix:
+  Keep the xterm cursor visible with `cursorStyle: "block"` and `cursorInactiveStyle: "outline"`, and refocus the terminal on connect/window focus rather than adding more UI chrome.
+
 - `/bootstrap?c=...` must be included in `assets.run_worker_first` in `wrangler.jsonc`.
   If only `/bootstrap/*` is listed, the asset handler will intercept the request and return a 404.
 

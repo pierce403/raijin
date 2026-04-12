@@ -31,10 +31,14 @@ const rxCountNode = document.querySelector("#rx-count");
 
 const sessionId = window.location.pathname.split("/").filter(Boolean).at(-1);
 const encoder = new TextEncoder();
+const platform = navigator.userAgentData?.platform || navigator.platform || "";
+const isApplePlatform = /mac|iphone|ipad/i.test(platform);
 
 const terminal = new Terminal({
   allowTransparency: false,
   cursorBlink: true,
+  cursorInactiveStyle: "outline",
+  cursorStyle: "block",
   fontFamily: '"IBM Plex Mono", "SFMono-Regular", monospace',
   fontSize: 14,
   scrollback: 5000,
@@ -42,6 +46,7 @@ const terminal = new Terminal({
     background: "#050505",
     foreground: "#f6f1eb",
     cursor: "#ffab4d",
+    cursorAccent: "#050505",
     black: "#090909",
     brightBlack: "#50433a",
     red: "#ff7657",
@@ -64,6 +69,15 @@ const terminal = new Terminal({
 const fitAddon = new FitAddon();
 terminal.loadAddon(fitAddon);
 terminal.open(terminalContainer);
+terminal.attachCustomKeyEventHandler((event) => {
+  if (shouldCopySelection(event)) {
+    event.preventDefault();
+    void copyTerminalSelection();
+    return false;
+  }
+
+  return true;
+});
 
 let websocket;
 let sessionInfo;
@@ -163,6 +177,16 @@ function playConnectionFlash() {
   }, 840);
 }
 
+function requestTerminalFocus() {
+  if (currentStatus !== "connected") {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    terminal.focus();
+  });
+}
+
 function updateLayoutForStatus(status) {
   const overlayVisible = status === "waiting_for_browser" || status === "waiting_for_agent";
   const terminalActive = status === "connected";
@@ -174,6 +198,7 @@ function updateLayoutForStatus(status) {
   if (terminalActive) {
     window.requestAnimationFrame(() => {
       fitTerminalAndNotify();
+      requestTerminalFocus();
     });
   }
 }
@@ -197,14 +222,16 @@ function setStatus(status) {
   const copyMap = {
     waiting_for_browser: "Waiting for browser...",
     waiting_for_agent: "Listening for connection...",
-    connected: "Remote shell connected.",
+    connected: "",
     expired: "Session expired.",
     disconnected: "Browser disconnected. Session terminated.",
     ended: "Session ended.",
     agent_closed: "Remote shell exited.",
   };
 
-  statusCopy.textContent = copyMap[normalized] || label;
+  const statusText = copyMap[normalized] ?? label;
+  statusCopy.textContent = statusText;
+  statusCopy.hidden = statusText.length === 0;
   updateLayoutForStatus(normalized);
 
   if (previousStatus !== "connected" && normalized === "connected") {
@@ -252,6 +279,89 @@ function sendMessage(message) {
   recordTraffic("tx", encoder.encode(payload).length);
 }
 
+function usesPrimaryModifier(event) {
+  if (isApplePlatform) {
+    return event.metaKey && !event.ctrlKey;
+  }
+
+  return event.ctrlKey && !event.metaKey;
+}
+
+function shouldCopySelection(event) {
+  return (
+    terminal.hasSelection()
+    && usesPrimaryModifier(event)
+    && !event.altKey
+    && event.key.toLowerCase() === "c"
+  );
+}
+
+function fallbackCopyText(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.readOnly = true;
+  textarea.setAttribute("aria-hidden", "true");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-9999px";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+
+  textarea.remove();
+  return copied;
+}
+
+async function copyTerminalSelection() {
+  const selection = terminal.getSelection();
+  if (!selection) {
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(selection);
+  } catch {
+    fallbackCopyText(selection);
+  }
+}
+
+function handleTerminalCopy(event) {
+  if (!terminal.hasSelection()) {
+    return;
+  }
+
+  const selection = terminal.getSelection();
+  if (!selection || !event.clipboardData) {
+    return;
+  }
+
+  event.clipboardData.setData("text/plain", selection);
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function handleTerminalPaste(event) {
+  if (currentStatus !== "connected" || sessionInfo?.readonly) {
+    return;
+  }
+
+  const text = event.clipboardData?.getData("text/plain");
+  if (!text) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  requestTerminalFocus();
+  terminal.paste(text);
+}
+
 function attachTerminalIO() {
   if (sessionInfo.readonly) {
     safeWriteLine("[readonly mode] keyboard input is disabled.");
@@ -288,7 +398,7 @@ function handleSocketMessage(event) {
     setRemoteIp(message.remoteIp);
     setStatus(message.status);
     if (message.status === "connected") {
-      terminal.focus();
+      requestTerminalFocus();
     }
     if (["expired", "disconnected", "ended", "agent_closed"].includes(message.status)) {
       ended = true;
@@ -349,6 +459,12 @@ async function connectBrowserSocket() {
   });
 }
 
+terminalContainer.addEventListener("copy", handleTerminalCopy, true);
+terminalContainer.addEventListener("paste", handleTerminalPaste, true);
+terminalContainer.addEventListener("pointerdown", () => {
+  requestTerminalFocus();
+});
+
 copyButton.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(bootstrapNode.value);
@@ -390,6 +506,10 @@ endButton.addEventListener("click", async () => {
 
 window.addEventListener("resize", () => {
   fitTerminalAndNotify();
+});
+
+window.addEventListener("focus", () => {
+  requestTerminalFocus();
 });
 
 window.addEventListener("beforeunload", () => {
