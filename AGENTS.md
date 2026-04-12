@@ -71,6 +71,10 @@ npx wrangler deploy --dry-run
   Fix:
   Treat `Cmd/Ctrl+C` as copy only when `terminal.hasSelection()` is true so interactive `Ctrl+C` still reaches the remote shell, and handle `copy`/`paste` events on `#terminal` to bridge browser clipboard data into the terminal session.
 
+- Do not refocus xterm on `pointerdown` in `src/frontend/session.js`.
+  Fix:
+  xterm already focuses itself on terminal `mousedown`. An extra pointerdown refocus can interrupt drag selection and make text highlighting look broken. Keep focus restoration on connect/window focus only.
+
 - The connected cursor is easy to lose if the terminal briefly drops focus.
   Fix:
   Keep the xterm cursor visible with `cursorStyle: "block"` and `cursorInactiveStyle: "outline"`, and refocus the terminal on connect/window focus rather than adding more UI chrome.

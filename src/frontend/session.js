@@ -48,6 +48,8 @@ const terminal = new Terminal({
     foreground: "#f6f1eb",
     cursor: "#ffab4d",
     cursorAccent: "#050505",
+    selectionBackground: "rgba(255, 171, 77, 0.28)",
+    selectionInactiveBackground: "rgba(255, 171, 77, 0.2)",
     black: "#090909",
     brightBlack: "#50433a",
     red: "#ff7657",
@@ -477,9 +479,6 @@ async function connectBrowserSocket() {
 
 terminalContainer.addEventListener("copy", handleTerminalCopy, true);
 terminalContainer.addEventListener("paste", handleTerminalPaste, true);
-terminalContainer.addEventListener("pointerdown", () => {
-  requestTerminalFocus();
-});
 
 copyButton.addEventListener("click", async () => {
   try {
