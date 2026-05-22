@@ -20,6 +20,7 @@ Keep updates specific. Prefer exact commands, file paths, and failure modes over
 - Favor end-to-end working paths over abstractions.
 - This repo should be committed and pushed after every completed task unless the user explicitly says not to.
 - Stage only files relevant to the task. Do not silently include unrelated work.
+- Avoid em dashes in product/UI copy; prefer plain punctuation like hyphen or colon.
 
 ## Project Overview
 
@@ -70,6 +71,12 @@ npx wrangler deploy --dry-run
 
 - `wrangler dev` may still show unrelated local environment variables from `.dev.vars`.
   The current app does not require `SESSION_SIGNING_KEY`; ignore that leftover local env unless the config is later cleaned up locally.
+
+- To disable the hard max lifetime, set `maxLifetimeSeconds: null` in browser session metadata.
+  `src/session-do.js` treats missing/non-positive `maxLifetimeSeconds` as unlimited while still enforcing idle timeout expiry.
+
+- In this Codex sandbox, git network operations may be blocked (`ssh ... port 22: Network is unreachable` and HTTPS CONNECT 403).
+  If conflict resolution requires syncing with GitHub, perform fetch/rebase/merge from an environment with outbound GitHub access.
 
 ## Remote Bootstrap Notes
 

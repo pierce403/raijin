@@ -65,6 +65,8 @@ a {
   gap: 24px;
   align-content: center;
   min-height: 100vh;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 860px;
 }
 
 .session-layout {
@@ -463,6 +465,10 @@ a {
 }
 
 @media (max-width: 960px) {
+  .shell-layout {
+    grid-template-columns: 1fr;
+  }
+
   .session-layout {
     grid-template-columns: 1fr;
   }

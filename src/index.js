@@ -209,7 +209,9 @@ function parseBootstrapConfig(request) {
     command: typeof config.command === "string" ? config.command : "",
     readonly: Boolean(config.readonly),
     idleTimeoutSeconds: Number(config.idleTimeoutSeconds || 600),
-    maxLifetimeSeconds: Number(config.maxLifetimeSeconds || 3600),
+    maxLifetimeSeconds: Number.isFinite(Number(config.maxLifetimeSeconds))
+      ? Number(config.maxLifetimeSeconds)
+      : null,
   };
 }
 
