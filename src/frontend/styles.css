@@ -193,25 +193,6 @@ a {
   align-content: start;
 }
 
-.launcher-layout {
-  width: min(960px, calc(100vw - 32px));
-  align-content: start;
-}
-
-.launcher-command-panel {
-  display: grid;
-  gap: 20px;
-}
-
-.launcher-command-panel h1 {
-  white-space: normal;
-  font-size: clamp(2rem, 5vw, 3.2rem);
-}
-
-.launcher-command-panel .lede {
-  margin: 0;
-}
-
 .launcher-command-field {
   display: grid;
   gap: 8px;
@@ -984,5 +965,318 @@ a {
     width: 100%;
     padding: 18px;
     border-radius: 18px;
+  }
+}
+
+.page-launcher {
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.launcher-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+}
+
+.launcher-header {
+  flex: none;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-strong);
+}
+
+.launcher-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.launcher-heading .eyebrow {
+  margin: 0;
+}
+
+.launcher-heading h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.launcher-command-panel {
+  margin-top: 12px;
+}
+
+.launcher-command-panel summary {
+  width: fit-content;
+  color: var(--orange-bright);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.launcher-command-content {
+  display: grid;
+  gap: 12px;
+  max-width: 1100px;
+  max-height: 45vh;
+  overflow: auto;
+  padding-top: 8px;
+}
+
+.launcher-command-content .lede {
+  max-width: none;
+  margin: 0;
+}
+
+.launcher-command-content .command-output {
+  min-height: 90px;
+  max-height: 20vh;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+
+.launcher-header > .form-error:not([hidden]) {
+  margin-top: 10px;
+}
+
+.launcher-terminals {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.terminal-tabs {
+  display: flex;
+  flex: none;
+  overflow-x: auto;
+  min-height: 48px;
+  border-bottom: 1px solid var(--border);
+  background: #101010;
+}
+
+.terminal-tabs:empty {
+  display: none;
+}
+
+.terminal-tab {
+  display: flex;
+  align-items: center;
+  flex: none;
+  max-width: 320px;
+  border-right: 1px solid var(--border);
+  border-top: 2px solid transparent;
+}
+
+.terminal-tab.is-active {
+  border-top-color: var(--orange-bright);
+  background: #21170e;
+}
+
+.terminal-tab-select {
+  display: grid;
+  gap: 2px;
+  min-width: 100px;
+  overflow: hidden;
+  padding: 7px 12px;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.terminal-tab-label {
+  overflow: hidden;
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-tab-status {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.terminal-tab.is-ended .terminal-tab-label {
+  color: var(--text-soft);
+}
+
+.terminal-tab-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin-right: 6px;
+  border: 0;
+  border-radius: 5px;
+  color: var(--text-soft);
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.terminal-tab-close:hover {
+  color: var(--text);
+  background: rgba(255, 171, 77, 0.12);
+}
+
+.terminal-tab-select:focus-visible,
+.terminal-tab-close:focus-visible,
+.launcher-command-panel summary:focus-visible {
+  outline: 2px solid var(--orange-bright);
+  outline-offset: -2px;
+}
+
+.terminal-tab-panels {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #050505;
+}
+
+.terminal-tab-panel {
+  position: absolute;
+  inset: 0;
+}
+
+.terminal-tab-panel[hidden],
+.launcher-empty[hidden] {
+  display: none;
+}
+
+.terminal-session-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.launcher-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+}
+
+.launcher-empty h2 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.launcher-empty p {
+  color: var(--text-soft);
+}
+
+.page-session.session-embedded {
+  overflow: hidden;
+  background: #050505;
+}
+
+.session-embedded .session-screen {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.session-embedded .session-topbar {
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: #101010;
+}
+
+.session-embedded .topbar-brand,
+.session-embedded .fact-card:nth-child(2),
+.session-embedded .fact-card:nth-child(3),
+.session-embedded .fact-card:nth-child(4),
+.session-embedded .fact-card > span:first-child,
+.session-embedded .status-copy,
+.session-embedded #end-session,
+.session-embedded #bootstrap-overlay {
+  display: none;
+}
+
+.session-embedded .session-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.session-embedded .fact-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.session-embedded .fact-card-traffic {
+  min-width: 0;
+}
+
+.session-embedded .status-badge {
+  min-height: 26px;
+  font-size: 0.8rem;
+}
+
+.session-embedded .topbar-actions {
+  display: flex;
+}
+
+.session-embedded .topbar-actions .secondary-button {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 0.78rem;
+}
+
+.session-embedded .terminal-panel {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 600px) {
+  .launcher-header {
+    padding: 10px;
+  }
+
+  .launcher-heading {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .launcher-heading h1 {
+    font-size: 0.88rem;
+  }
+
+  .launcher-heading .status-badge {
+    min-height: 26px;
+    padding: 0 8px;
+    font-size: 0.78rem;
+  }
+
+  .session-embedded .fact-card-traffic {
+    display: none;
   }
 }

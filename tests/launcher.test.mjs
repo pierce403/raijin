@@ -4,7 +4,8 @@ import { createHash, randomBytes, webcrypto } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
-// Run the real frontend with small browser adapters. Actual tab rendering is covered by browser smoke tests.
+// Exercise the real frontend with small DOM adapters. Real frame rendering and PTYs
+// are checked in browser smoke tests; these checks cover tab ownership and lifecycle.
 const storeSource = await readFile(new URL("../src/frontend/session-store.js", import.meta.url), "utf8");
 const storeExports = Array.from(storeSource.matchAll(/export (?:async )?(?:function|const) (\w+)/gu), match => match[1]);
 const launcherSource = (await readFile(new URL("../src/frontend/launcher.js", import.meta.url), "utf8"))
@@ -16,14 +17,58 @@ class Element {
     this.tag = tag;
     this.children = [];
     this.listeners = new Map();
+    this.attributes = new Map();
+    this.hidden = false;
+    this.srcWrites = 0;
+    this.detachments = 0;
+    this.focusCalls = 0;
+    this.classList = {
+      toggle: (name, force) => {
+        const classes = new Set((this.className || "").split(" ").filter(Boolean));
+        const add = force ?? !classes.has(name);
+        if (add) classes.add(name); else classes.delete(name);
+        this.className = Array.from(classes).join(" ");
+        return add;
+      },
+      contains: name => (this.className || "").split(" ").includes(name),
+    };
+    if (tag === "iframe") {
+      this.messages = [];
+      this.contentWindow = {
+        postMessage: (message, origin) => this.messages.push({ ...message, origin }),
+      };
+    }
   }
-  append(...children) { this.children.push(...children); }
-  replaceChildren(...children) { this.children = children; }
+  set src(value) { this._src = value; this.srcWrites += 1; }
+  get src() { return this._src; }
+  append(...children) {
+    for (const child of children) {
+      if (child.parentNode) child.remove();
+      child.parentNode = this;
+      this.children.push(child);
+    }
+  }
+  replaceChildren(...children) {
+    for (const child of [...this.children]) child.remove();
+    this.append(...children);
+  }
+  remove() {
+    if (!this.parentNode) return;
+    this.parentNode.children = this.parentNode.children.filter(child => child !== this);
+    this.parentNode = null;
+    this.detachments += 1;
+  }
   addEventListener(name, callback) { this.listeners.set(name, callback); }
+  emit(name, event = {}) { return this.listeners.get(name)?.(event); }
+  setAttribute(name, value) { this.attributes.set(name, String(value)); }
+  getAttribute(name) { return this.attributes.get(name) ?? null; }
+  focus() { this.focusCalls += 1; }
+  scrollIntoView() {}
 }
 
 function token() { return randomBytes(32).toString("base64url"); }
 function newRun() { return { runId: token(), agentToken: token() }; }
+const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function fixture() {
   const data = new Map();
@@ -51,21 +96,24 @@ function fixture() {
   return { storage, launcher };
 }
 
-async function openListener({ storage, launcher }, { blockPopups = false } = {}) {
+async function openListener({ storage, launcher }) {
   const nodes = new Map();
-  const tabs = [];
+  const popupCalls = [];
   const timers = [];
-  let popupsBlocked = blockPopups;
+  const windowListeners = new Map();
+  const requests = [];
+  let endResponse = { ok: true, status: 200, json: async () => ({ ok: true }) };
   class Socket {
     static instances = [];
     constructor(url) {
       this.url = url;
       this.listeners = new Map();
+      this.closeCalls = 0;
       Socket.instances.push(this);
     }
     addEventListener(name, callback) { this.listeners.set(name, callback); }
     send(value) { this.sent = JSON.parse(value); }
-    close() {}
+    close() { this.closeCalls += 1; }
     emit(name, event) { this.listeners.get(name)?.(event); }
   }
   const document = {
@@ -78,18 +126,16 @@ async function openListener({ storage, launcher }, { blockPopups = false } = {})
   const window = {
     location: { pathname: `/l/${launcher.sessionId}`, origin: "https://example.test", hash: "" },
     history: { replaceState() {} },
-    open(url, name) {
-      const tab = popupsBlocked ? null : { opener: {} };
-      tabs.push({ url, name, tab });
-      return tab;
-    },
+    open(...args) { popupCalls.push(args); throw new Error("Popups are blocked"); },
     setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length; },
     clearTimeout() {},
-    addEventListener() {},
+    requestAnimationFrame(callback) { callback(); },
+    addEventListener(name, callback) { windowListeners.set(name, callback); },
   };
   const context = vm.createContext({
     window, document, localStorage: storage,
     navigator: { clipboard: { async writeText() {} } },
+    fetch: async (url, options) => { requests.push({ url, options }); return endResponse; },
     WebSocket: Socket, URL, URLSearchParams, Intl, Date,
     crypto: webcrypto, TextEncoder, TextDecoder, btoa, atob,
   });
@@ -104,23 +150,38 @@ async function openListener({ storage, launcher }, { blockPopups = false } = {})
   assert.equal(socket.sent.browserToken, launcher.browserToken);
   assert.equal(socket.sent.agentTokenHash, createHash("sha256").update(launcher.agentToken).digest("base64url"));
   socket.emit("message", { data: JSON.stringify({ type: "ready" }) });
+  const headers = () => nodes.get("#launcher-runs").children;
+  const panels = () => nodes.get("#launcher-panels").children;
+  const header = id => headers().find(node => node.children[0].id === `tab-${id}`);
+  const panel = id => panels().find(node => node.id === `panel-${id}`);
+  const frame = id => panel(id)?.children[0];
   return {
-    nodes, tabs, socket, timers, store: context.store,
-    allowPopups() { popupsBlocked = false; },
+    nodes, popupCalls, socket, timers, requests, store: context.store,
+    headers, panels, header, panel, frame,
+    frames: () => panels().map(node => node.children[0]),
     run: message => socket.emit("message", { data: JSON.stringify({ type: "run", ...message }) }),
+    select: id => header(id).children[0].emit("click"),
+    async close(id) { header(id).children[1].emit("click"); await settle(); },
+    setEndResponse(response) { endResponse = response; },
+    emit: (type, event = {}) => windowListeners.get(type)?.(event),
+    status(id, status, extra = {}) {
+      windowListeners.get("message")?.({
+        origin: window.location.origin,
+        source: frame(id)?.contentWindow,
+        data: { type: "raijin:session-status", sessionId: id, status, ...extra },
+      });
+    },
   };
 }
 
-test("each invocation gets an isolated tab; replay and reload preserve existing credentials", async () => {
-  const setup = fixture();
-  const page = await openListener(setup);
+test("each invocation opens its own embedded terminal without popups or replayed credentials", async () => {
+  const page = await openListener(fixture());
   const first = newRun();
   const second = newRun();
   page.run(first);
   page.run(second);
-  assert.equal(page.tabs.length, 2);
-  assert.notEqual(page.tabs[0].name, page.tabs[1].name);
-  assert.equal(page.tabs[0].tab.opener, null);
+  assert.equal(page.frames().length, 2, page.nodes.get("#launcher-error").textContent);
+  assert.equal(page.popupCalls.length, 0);
   const child = page.store.loadSession(first.runId);
   assert.equal(child.agentToken, first.agentToken);
   assert.equal(child.reusable, undefined);
@@ -128,59 +189,190 @@ test("each invocation gets an isolated tab; replay and reload preserve existing 
   assert.notEqual(child.browserToken, page.store.loadSession(second.runId).browserToken);
   assert.equal(page.store.listSessionHistory().length, 2);
   assert.equal(page.store.listLaunchers().length, 1);
-
+  for (const run of [first, second]) {
+    const url = new URL(page.frame(run.runId).src, "https://example.test");
+    assert.equal(url.pathname, `/s/${run.runId}`);
+    assert.equal(url.searchParams.get("embedded"), "1");
+    const bundle = page.store.decodeSessionFragment(new URLSearchParams(url.hash.slice(1)).get("s"));
+    assert.equal(bundle.browserToken, page.store.loadSession(run.runId).browserToken);
+  }
   page.run(first);
-  assert.equal(page.tabs.length, 2);
-  const reloaded = await openListener(setup);
-  reloaded.run(first);
-  reloaded.run(second);
-  assert.equal(reloaded.tabs.length, 0);
-  assert.equal(reloaded.store.loadSession(first.runId).browserToken, child.browserToken);
-  reloaded.store.deleteSession(first.runId);
-  reloaded.run(first);
-  assert.equal(reloaded.store.loadSession(first.runId), null);
-  assert.equal(reloaded.tabs.length, 0);
+  assert.equal(page.frames().length, 2);
+  assert.equal(page.store.loadSession(first.runId).browserToken, child.browserToken);
+  assert.equal(page.panel(first.runId).hidden, true);
+  assert.equal(page.panel(second.runId).hidden, false);
 });
 
-test("blocked popups leave a working manual link without repeatedly opening tabs", async () => {
-  const page = await openListener(fixture(), { blockPopups: true });
+test("switching keeps both terminal documents mounted and tells each frame whether it is active", async () => {
+  const page = await openListener(fixture());
+  const first = newRun();
+  const second = newRun();
+  page.run(first);
+  const firstFrame = page.frame(first.runId);
+  const firstPanel = page.panel(first.runId);
+  page.run(second);
+  const secondFrame = page.frame(second.runId);
+  const secondPanel = page.panel(second.runId);
+  for (const id of [first.runId, second.runId, first.runId]) page.select(id);
+  assert.equal(page.frame(first.runId), firstFrame);
+  assert.equal(page.frame(second.runId), secondFrame);
+  for (const node of [firstFrame, firstPanel, secondFrame, secondPanel]) assert.equal(node.detachments, 0);
+  for (const frame of [firstFrame, secondFrame]) assert.equal(frame.srcWrites, 1);
+  assert.equal(firstPanel.hidden, false);
+  assert.equal(secondPanel.hidden, true);
+  assert.deepEqual(firstFrame.messages.at(-1), {
+    type: "raijin:activate", sessionId: first.runId, active: true, focusTerminal: true, origin: "https://example.test",
+  });
+  assert.deepEqual(secondFrame.messages.at(-1), {
+    type: "raijin:activate", sessionId: second.runId, active: false, focusTerminal: true, origin: "https://example.test",
+  });
+  // A delayed load/status from the background shell must not select its tab.
+  secondFrame.emit("load");
+  page.status(second.runId, "connected");
+  assert.equal(firstPanel.hidden, false);
+  assert.equal(secondPanel.hidden, true);
+  assert.equal(page.header(first.runId).children[0].getAttribute("aria-selected"), "true");
+});
+
+test("arrow navigation keeps focus on the tab strip while click selection focuses the terminal", async () => {
+  const page = await openListener(fixture());
+  const first = newRun();
+  const second = newRun();
+  page.run(first);
+  page.run(second);
+  const firstButton = page.header(first.runId).children[0];
+  const secondButton = page.header(second.runId).children[0];
+  let prevented = false;
+  secondButton.emit("keydown", { key: "ArrowLeft", preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(firstButton.focusCalls, 1);
+  assert.equal(firstButton.getAttribute("aria-selected"), "true");
+  assert.equal(page.frame(first.runId).messages.at(-1).active, true);
+  assert.equal(page.frame(first.runId).messages.at(-1).focusTerminal, false);
+  assert.equal(page.frame(second.runId).messages.at(-1).active, false);
+  assert.equal(page.frame(second.runId).messages.at(-1).focusTerminal, false);
+  firstButton.emit("keydown", { key: "ArrowRight", preventDefault() {} });
+  assert.equal(secondButton.focusCalls, 1);
+  assert.equal(page.frame(second.runId).messages.at(-1).focusTerminal, false);
+  page.select(first.runId);
+  assert.equal(page.frame(first.runId).messages.at(-1).focusTerminal, true);
+});
+
+test("closing a live tab ends only its child session and leaves the listener and other frame running", async () => {
+  const setup = fixture();
+  const page = await openListener(setup);
+  const first = newRun();
+  const second = newRun();
+  page.run(first);
+  page.run(second);
+  const firstToken = page.store.loadSession(first.runId).browserToken;
+  const otherFrame = page.frame(second.runId);
+  await page.close(first.runId);
+  assert.equal(page.requests.length, 1);
+  assert.equal(page.requests[0].url, `/api/sessions/${first.runId}/end`);
+  assert.equal(page.requests[0].options.method, "POST");
+  assert.equal(page.requests[0].options.headers.authorization, `Bearer ${firstToken}`);
+  assert.equal(page.frame(first.runId), undefined);
+  assert.equal(page.store.loadSession(first.runId), null);
+  assert.equal(page.frame(second.runId), otherFrame);
+  assert.equal(otherFrame.srcWrites, 1);
+  assert.equal(otherFrame.detachments, 0);
+  assert.equal(page.socket.closeCalls, 0);
+  page.run(first);
+  assert.equal(page.frames().length, 1);
+  const record = page.store.loadLauncherRuns(setup.launcher.sessionId).find(item => item.sessionId === first.runId);
+  assert.equal(record.ended, true);
+});
+
+test("a failed end request keeps its tab available for retry", async () => {
+  const page = await openListener(fixture());
   const run = newRun();
   page.run(run);
-  page.run(run);
-  assert.equal(page.tabs.length, 1);
-  assert.equal(page.tabs[0].tab, null);
-  const actions = page.nodes.get("#launcher-runs").children[0].children[1];
-  const link = actions.children.find(child => child.tag === "a");
-  assert.equal(link.textContent, "Open Session");
-  assert.equal(link.rel, "noopener");
-  const url = new URL(link.href, "https://example.test");
-  assert.equal(url.pathname, `/s/${run.runId}`);
-  const bundle = page.store.decodeSessionFragment(new URLSearchParams(url.hash.slice(1)).get("s"));
-  assert.equal(bundle.browserToken, page.store.loadSession(run.runId).browserToken);
-  page.allowPopups();
-  let prevented = false;
-  link.listeners.get("click")({ preventDefault() { prevented = true; } });
-  assert.equal(prevented, true);
-  assert.equal(page.tabs.length, 2);
-  assert.equal(page.tabs[1].tab.opener, null);
+  const frame = page.frame(run.runId);
+  page.setEndResponse({ ok: false, status: 500, json: async () => ({ error: "Try again" }) });
+  await page.close(run.runId);
+  assert.equal(page.frame(run.runId), frame);
+  assert.equal(page.header(run.runId).children[1].disabled, false);
+  assert.equal(page.nodes.get("#launcher-error").textContent, "Try again");
+  assert.ok(page.store.loadSession(run.runId));
+  page.setEndResponse({ ok: true, status: 200 });
+  await page.close(run.runId);
+  assert.equal(page.frames().length, 0);
 });
 
-test("the run index and rendered list stay bounded while recent ended runs remain deduplicated", async () => {
-  const setup = fixture();
-  const page = await openListener(setup, { blockPopups: true });
-  const invocations = Array.from({ length: 250 }, newRun);
-  for (const run of invocations) page.run(run);
-  assert.equal(page.tabs.length, 250);
-  assert.equal(page.store.loadLauncherRuns(setup.launcher.sessionId).length, 200);
-  assert.equal(page.nodes.get("#launcher-runs").children.length, 200);
-  assert.equal(JSON.parse(setup.storage.getItem(`raijin:launcher-runs:${setup.launcher.sessionId}`)).length, 200);
+test("only the matching same-origin frame can change its session tab status", async () => {
+  const page = await openListener(fixture());
+  const first = newRun();
+  const second = newRun();
+  page.run(first);
+  page.run(second);
+  const firstButton = page.header(first.runId).children[0];
+  const statusNode = firstButton.children[1];
+  const originalStatus = statusNode.textContent;
+  const data = { type: "raijin:session-status", sessionId: first.runId, status: "agent_closed" };
+  for (const event of [
+    { origin: "https://elsewhere.test", source: page.frame(first.runId).contentWindow, data },
+    { origin: "https://example.test", source: page.frame(second.runId).contentWindow, data },
+    { origin: "https://example.test", source: {}, data },
+    { origin: "https://example.test", source: page.frame(first.runId).contentWindow, data: { ...data, status: "untrusted" } },
+    { origin: "https://example.test", source: page.frame(first.runId).contentWindow, data: { ...data, type: "close" } },
+  ]) page.emit("message", event);
+  assert.equal(statusNode.textContent, originalStatus);
+  assert.equal(page.frames().length, 2);
+  assert.equal(page.requests.length, 0);
+  page.status(first.runId, "connected", { remoteIp: "192.0.2.12" });
+  assert.equal(statusNode.textContent, "connected");
+  assert.equal(firstButton.children[0].textContent, "192.0.2.12");
+  assert.equal(page.panel(first.runId).hidden, true);
+  page.status(first.runId, "agent_closed");
+  assert.equal(statusNode.textContent, "exited");
+  page.store.deleteSession(first.runId);
+  await page.close(first.runId);
+  assert.equal(page.requests.length, 0);
+  page.run(first);
+  assert.equal(page.frames().length, 1);
+});
 
+test("pagehide records ended children so reload and run replay do not resurrect closed shells", async () => {
+  const setup = fixture();
+  const page = await openListener(setup);
+  const first = newRun();
+  const second = newRun();
+  page.run(first);
+  page.run(second);
+  page.status(first.runId, "agent_closed");
+  page.store.deleteSession(first.runId);
+  page.emit("pagehide");
+  assert.equal(page.socket.closeCalls, 1);
+  const reloaded = await openListener(setup);
+  assert.equal(reloaded.frames().length, 0);
+  reloaded.run(first);
+  reloaded.run(second);
+  assert.equal(reloaded.frames().length, 0);
+  const fresh = newRun();
+  reloaded.run(fresh);
+  assert.equal(reloaded.frames().length, 1);
+  assert.equal(reloaded.store.loadSession(first.runId), null);
+});
+
+test("recent ended runs stay deduplicated while saved run history remains bounded", async () => {
+  const setup = fixture();
+  const page = await openListener(setup);
+  const invocations = Array.from({ length: 250 }, newRun);
+  for (const run of invocations) {
+    page.run(run);
+    page.status(run.runId, "agent_closed");
+    page.store.deleteSession(run.runId);
+    await page.close(run.runId);
+  }
+  assert.equal(page.frames().length, 0);
+  assert.equal(page.headers().length, 0);
+  assert.equal(page.store.loadLauncherRuns(setup.launcher.sessionId).length, 200);
+  assert.equal(JSON.parse(setup.storage.getItem(`raijin:launcher-runs:${setup.launcher.sessionId}`)).length, 200);
   const recentRuns = invocations.slice(-100);
-  for (const run of recentRuns) page.store.deleteSession(run.runId);
   const reloaded = await openListener(setup);
   for (const run of recentRuns) reloaded.run(run);
-  assert.equal(reloaded.tabs.length, 0);
-  assert.equal(reloaded.nodes.get("#launcher-runs").children.length, 200);
+  assert.equal(reloaded.frames().length, 0);
   for (const run of recentRuns) assert.equal(reloaded.store.loadSession(run.runId), null);
 });
 
@@ -210,7 +402,7 @@ test("child tabs copy the reusable command without carrying the listener's brows
   assert.equal(childConfig.reusable, true);
   assert.equal(childConfig.sessionId, setup.launcher.sessionId);
   assert.equal(childConfig.token, setup.launcher.agentToken);
-  const fragment = new URL(page.tabs[0].url, "https://example.test").hash;
+  const fragment = new URL(page.frame(run.runId).src, "https://example.test").hash;
   const bundle = page.store.decodeSessionFragment(new URLSearchParams(fragment.slice(1)).get("s"));
   assert.equal(bundle.launcherId, setup.launcher.sessionId);
   assert.equal(bundle.browserToken, child.browserToken);

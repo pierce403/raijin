@@ -35,6 +35,11 @@ const txCountNode = document.querySelector("#tx-count");
 const rxCountNode = document.querySelector("#rx-count");
 
 const sessionId = window.location.pathname.split("/").filter(Boolean).at(-1);
+const isEmbedded = window.parent !== window
+  && new URLSearchParams(window.location.search).get("embedded") === "1";
+let embeddedActive = !isEmbedded;
+let embeddedFocusRequested = !isEmbedded;
+document.body.classList.toggle("session-embedded", isEmbedded);
 const encoder = new TextEncoder();
 const outputDecoder = new TextDecoder();
 const platform = navigator.userAgentData?.platform || navigator.platform || "";
@@ -242,12 +247,14 @@ function playConnectionFlash() {
 }
 
 function requestTerminalFocus() {
-  if (currentStatus !== "connected") {
+  if (currentStatus !== "connected" || !embeddedActive || !embeddedFocusRequested) {
     return;
   }
 
   window.requestAnimationFrame(() => {
-    terminal.focus();
+    if (embeddedActive && embeddedFocusRequested) {
+      terminal.focus();
+    }
   });
 }
 
@@ -305,6 +312,15 @@ function setStatus(status) {
   }
   updateLayoutForStatus(normalized);
 
+  if (isEmbedded) {
+    window.parent.postMessage({
+      type: "raijin:session-status",
+      sessionId,
+      status: normalized,
+      remoteIp: remoteIpNode.textContent === "pending" ? "" : remoteIpNode.textContent,
+    }, window.location.origin);
+  }
+
   if (previousStatus !== "connected" && normalized === "connected") {
     playConnectionFlash();
   }
@@ -336,7 +352,7 @@ function loadSessionFromFragment() {
   }
 
   saveSession(candidate);
-  window.history.replaceState(null, "", window.location.pathname);
+  window.history.replaceState(null, "", window.location.pathname + window.location.search);
   return candidate;
 }
 
@@ -514,6 +530,9 @@ function detachTerminalIO() {
 }
 
 function fitTerminalAndNotify() {
+  if (!embeddedActive || !terminalContainer.clientWidth || !terminalContainer.clientHeight) {
+    return;
+  }
   fitAddon.fit();
   sendMessage({
     type: "resize",
@@ -650,6 +669,26 @@ window.addEventListener("focus", () => {
   requestTerminalFocus();
 });
 
+window.addEventListener("message", (event) => {
+  if (!isEmbedded || event.origin !== window.location.origin || event.source !== window.parent
+      || event.data?.type !== "raijin:activate" || event.data.sessionId !== sessionId
+      || typeof event.data.active !== "boolean") {
+    return;
+  }
+  embeddedActive = event.data.active;
+  embeddedFocusRequested = event.data.focusTerminal !== false;
+  if (embeddedActive) {
+    window.requestAnimationFrame(() => {
+      fitTerminalAndNotify();
+      requestTerminalFocus();
+    });
+  }
+});
+
+new ResizeObserver(() => {
+  fitTerminalAndNotify();
+}).observe(terminalContainer);
+
 window.addEventListener("beforeunload", () => {
   flushTranscriptBuffers();
   if (websocket && websocket.readyState === WebSocket.OPEN) {
@@ -663,7 +702,7 @@ async function init() {
     // The listener has already saved same-origin metadata before opening this tab.
     // Strip transferred credentials even when that local record was found first.
     if (sessionInfo && window.location.hash) {
-      window.history.replaceState(null, "", window.location.pathname);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
     if (!sessionInfo) {
       throw new Error("Session metadata was not found for this origin.");

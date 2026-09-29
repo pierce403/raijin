@@ -206,7 +206,10 @@ async function serveAssetHtml(env, request, assetPath) {
   }
 
   const headers = new Headers(response.headers);
-  for (const [key, value] of Object.entries(htmlHeaders())) {
+  const securityHeaders = htmlHeaders(assetPath === "/session.html" ? {
+    "content-security-policy": CSP_HEADER.replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+  } : {});
+  for (const [key, value] of Object.entries(securityHeaders)) {
     headers.set(key, value);
   }
   return new Response(response.body, { status: response.status, headers });

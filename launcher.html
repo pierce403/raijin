@@ -3,44 +3,45 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>raijin.sh reusable command</title>
+    <title>raijin.sh terminal sessions</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script type="module" src="/src/frontend/launcher.js"></script>
   </head>
   <body class="page page-launcher">
-    <main class="shell-layout launcher-layout">
-      <section class="hero-card launcher-command-panel">
-        <div class="hero-card-top">
+    <main class="launcher-layout">
+      <header class="launcher-header">
+        <div class="launcher-heading">
           <a class="eyebrow" href="/">raijin.sh</a>
+          <h1>Terminal sessions</h1>
           <span id="launcher-status" class="status-badge status-waiting" role="status">connecting</span>
         </div>
-        <h1>One command. New shells.</h1>
-        <p class="lede">
-          Run this command on a system you control. Each run creates a separate
-          session in a new tab, even when another session is already connected.
-        </p>
-        <label class="stack-field launcher-command-field" for="bootstrap-command">
-          <span>Reusable Python command</span>
-          <textarea id="bootstrap-command" class="command-output" readonly spellcheck="false"></textarea>
-        </label>
-        <div class="action-row">
-          <button id="copy-command" class="primary-button" type="button" disabled>Copy Command</button>
-          <p id="launcher-status-copy" class="helper-copy">Connecting the listener...</p>
-        </div>
-        <p class="lede compact">
-          Keep this listener tab open and allow popups for automatic session tabs.
-          If a tab is blocked, use Open Session below. The remote shell waits until
-          its session tab connects.
-        </p>
+        <details id="launcher-command-details" class="launcher-command-panel" open>
+          <summary>Reusable command</summary>
+          <div class="launcher-command-content">
+            <p class="lede compact">
+              Run this on a system you control. Each connection opens a terminal tab here.
+              Keep this page open while using your shells.
+            </p>
+            <label class="stack-field launcher-command-field" for="bootstrap-command">
+              <span>Python command</span>
+              <textarea id="bootstrap-command" class="command-output" readonly spellcheck="false"></textarea>
+            </label>
+            <div class="action-row">
+              <button id="copy-command" class="primary-button" type="button" disabled>Copy Command</button>
+              <p id="launcher-status-copy" class="helper-copy">Connecting the listener...</p>
+            </div>
+          </div>
+        </details>
         <p id="launcher-error" class="form-error" role="alert" hidden></p>
-      </section>
-      <section class="panel session-history-panel">
-        <div class="panel-header">
-          <p class="eyebrow">This Command</p>
-          <h2>Sessions</h2>
+      </header>
+      <section class="launcher-terminals" aria-label="Terminal sessions">
+        <div id="launcher-runs" class="terminal-tabs" role="tablist" aria-label="Terminal sessions"></div>
+        <div id="launcher-panels" class="terminal-tab-panels">
+          <div id="launcher-empty" class="launcher-empty">
+            <h2>Waiting for a connection</h2>
+            <p>Run the command to open your first terminal tab.</p>
+          </div>
         </div>
-        <div id="launcher-runs" class="session-history-list"></div>
-        <p id="launcher-empty" class="session-history-empty">Run the command to open your first session.</p>
       </section>
     </main>
   </body>

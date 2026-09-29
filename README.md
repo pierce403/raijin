@@ -60,8 +60,8 @@ Open `http://localhost:8787`.
 1. Open the home page.
 2. Click `New Session`.
 3. Copy the bootstrap command from `/l/:launcherId` and leave that listener open.
-4. Paste it into a Linux shell you control. Each execution requests a new terminal tab.
-5. Allow popups for automatic tabs, or click that run's `Open Session` link. The agent waits about five minutes before starting its shell.
+4. Paste it into a Linux shell you control. Each execution automatically opens a terminal tab inside the listener page.
+5. Switch between tabs without interrupting their shells. The agent waits about five minutes for its terminal before starting its shell.
 6. Run the identical command again and verify that it opens a separate session with isolated input/output.
 7. Click `End Session` in one terminal and confirm only its shell exits. Reuse the same command after all shells exit.
 8. Reopen saved listeners from `Recent Commands` on the homepage. Commands copied before this feature remain single-session commands; create a new listener to get a reusable one.
@@ -105,7 +105,7 @@ After the first deploy, add `raijin.sh` as a custom domain in Cloudflare. The bo
 
 - [src/index.js](/home/pierce/projects/raijin/src/index.js): Worker routes and bootstrap generation
 - [src/launcher-do.js](src/launcher-do.js): in-memory reusable-command registration and browser notifications
-- [src/frontend/launcher.js](src/frontend/launcher.js): reusable command UI, new tabs, and popup fallback
+- [src/frontend/launcher.js](src/frontend/launcher.js): reusable command UI and automatic terminal tabs
 - [src/session-do.js](/home/pierce/projects/raijin/src/session-do.js): session Durable Object
 - [src/frontend/home.js](/home/pierce/projects/raijin/src/frontend/home.js): home page UI
 - [src/frontend/session.js](/home/pierce/projects/raijin/src/frontend/session.js): session page UI and terminal client
@@ -123,7 +123,7 @@ Verified locally on April 10, 2026 with:
 ### Reusable-command regression checks
 
 ```bash
-node --test tests/bootstrap.test.mjs tests/launcher.test.mjs
+node --test tests/bootstrap.test.mjs tests/launcher.test.mjs tests/embedding.test.mjs
 # With wrangler dev running:
 node tests/relay-smoke.mjs
 node tests/reusable-smoke.mjs
@@ -131,4 +131,4 @@ node tests/reusable-smoke.mjs
 
 The runtime suite covers simultaneous real Python PTYs, independent credentials and I/O, reuse after exit, idempotent registration, browser readiness, and stale socket closure. Use `RAIJIN_TEST_URL=https://raijin.sh` to run either smoke script against production with fresh test sessions.
 
-The listener accepts at most 100 registrations in a ten-minute window. Registration and tab startup wait about five minutes in the agent. Closing the listener stops new registrations until it is reopened; existing terminal tabs keep running independently. No server session or listener state survives a Worker restart.
+The listener accepts at most 100 registrations in a ten-minute window. Registration and tab startup wait about five minutes in the agent. Closing a terminal tab ends only that shell. Closing or reloading the listener page closes all its terminal connections and ends those shells; the saved command can still be reused when the listener is reopened. No server session or listener state survives a Worker restart.
