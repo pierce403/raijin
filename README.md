@@ -93,6 +93,8 @@ This repo is designed for Cloudflare Workers Builds.
 
 8. Save and deploy.
 
+For later changes, push to the tracked branch and wait for its automatic deployment before running production checks. Running a manual deploy immediately after a push creates two deployments; either can interrupt live in-memory sessions.
+
 ### Important Cloudflare detail
 
 Cloudflare Workers Builds expects the Worker name in the dashboard to match the `name` field in [wrangler.jsonc](/home/pierce/projects/raijin/wrangler.jsonc). This repo uses `raijin`.
