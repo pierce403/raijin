@@ -289,6 +289,7 @@ function buildBootstrapScript(config) {
   return `#!/usr/bin/env python3
 import base64
 import fcntl
+import http.client
 import json
 import os
 import pty
@@ -324,19 +325,26 @@ def request_json(method, path, payload=None, timeout=POLL_TIMEOUT):
     url = BASE_URL + path
     data = None if payload is None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(url, data=data, method=method, headers=REQUEST_HEADERS)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            body = response.read()
-            if not body:
-                return {}
-            return json.loads(body.decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        if error.code == 409:
-            return {"retry": True}
-        body = error.read().decode("utf-8", "replace")
-        raise RuntimeError(f"{method} {path} failed with {error.code}: {body}") from error
-    except urllib.error.URLError as error:
-        raise RuntimeError(f"{method} {path} failed: {error}") from error
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                body = response.read()
+                if not body:
+                    return {}
+                return json.loads(body.decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if error.code == 409:
+                error.close()
+                return {"retry": True}
+            retryable = 500 <= error.code < 600
+            status = error.code
+            error.close()
+            if not retryable or attempt == 2:
+                raise RuntimeError(f"{method} {path} failed with {status}") from error
+        except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+            if attempt == 2:
+                raise RuntimeError(f"{method} {path} failed after 3 attempts") from error
+        time.sleep(0.5 * (2 ** attempt))
 
 def kill_child(graceful=True):
     global RUNNING
@@ -422,13 +430,17 @@ def read_and_forward():
                 break
             if not chunk:
                 break
-            payload = request_json(
-                "POST",
-                f"/agent/{SESSION_ID}/out",
-                {"data": base64.b64encode(chunk).decode("ascii")},
-                timeout=10,
-            )
-            if payload.get("retry"):
+            # Keep this chunk while the browser is initializing the session.
+            # Transport retries may replay output if only the ACK was lost.
+            while RUNNING:
+                payload = request_json(
+                    "POST",
+                    f"/agent/{SESSION_ID}/out",
+                    {"data": base64.b64encode(chunk).decode("ascii")},
+                    timeout=10,
+                )
+                if not payload.get("retry"):
+                    break
                 time.sleep(1)
     finally:
         close_remote("process exited", exit_code)

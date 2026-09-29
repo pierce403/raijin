@@ -134,3 +134,11 @@ npx wrangler deploy --dry-run
 4. Update this file if you learned something durable.
 5. Commit with a focused message.
 6. Push the result to `origin`.
+
+## Relay Failure Regression Checks (2026-09-29)
+
+- `node --test tests/bootstrap.test.mjs` runs six Python regression cases against the generated bootstrap (Python 3 required). Covers transient errors, retry exhaustion, terminal HTTP errors, and retaining output across 409. In the restricted agent sandbox the Node test runner can hang; running outside that sandbox succeeded.
+- With `npx wrangler dev --local --port 8787` running, `node tests/relay-smoke.mjs` checks attached/detached browser output, concurrent long-poll, heartbeat, close, and a real Python PTY bootstrap running a fixed printf command. Uses `ws` supplied by the installed Wrangler dependency tree.
+- `RAIJIN_TEST_URL=https://raijin.sh node tests/relay-smoke.mjs` targets fresh production test sessions and closes them afterward. This is an explicit live test, not a read-only probe.
+- The reported first `/out` crash did not reproduce locally or on production with an initialized session and detached browser. A browser hello initializes server state; a never-initialized session returns 409. Detached output is ACKed and dropped. Closing a browser after the agent connects intentionally ends the session.
+- Bootstrap requests now make at most three attempts for transport errors and HTTP 5xx, with 0.5s/1s backoff. 401/403/410 are terminal; 409 retains its waiting contract. Output retries can duplicate text if the server delivered it but its ACK was lost. There is no exactly-once delivery or server persistence.
