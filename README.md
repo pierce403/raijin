@@ -63,7 +63,7 @@ Open `http://localhost:8787`.
 4. Paste it into a Linux shell you control. Each execution automatically opens a terminal tab inside the listener page.
 5. Switch between tabs without interrupting their shells. The agent waits about five minutes for its terminal before starting its shell.
 6. Run the identical command again and verify that it opens a separate session with isolated input/output.
-7. Click `End Session` in one terminal and confirm only its shell exits. Reuse the same command after all shells exit.
+7. Close one terminal with its tab's `×` button and confirm only its shell exits. Reuse the same command after all shells exit.
 8. Reopen saved listeners from `Recent Commands` on the homepage. Commands copied before this feature remain single-session commands; create a new listener to get a reusable one.
 
 See [TEST_PLAN.md](/home/pierce/projects/raijin/TEST_PLAN.md) for the full manual checklist.
@@ -123,12 +123,23 @@ Verified locally on April 10, 2026 with:
 ### Reusable-command regression checks
 
 ```bash
-node --test tests/bootstrap.test.mjs tests/launcher.test.mjs tests/embedding.test.mjs
+node --test tests/*.test.mjs
 # With wrangler dev running:
 node tests/relay-smoke.mjs
 node tests/reusable-smoke.mjs
+node tests/transport-smoke.mjs
 ```
 
 The runtime suite covers simultaneous real Python PTYs, independent credentials and I/O, reuse after exit, idempotent registration, browser readiness, and stale socket closure. Use `RAIJIN_TEST_URL=https://raijin.sh` to run either smoke script against production with fresh test sessions.
 
 The listener accepts at most 100 registrations in a ten-minute window. Registration and tab startup wait about five minutes in the agent. Closing a terminal tab ends only that shell. Closing or reloading the listener page closes all its terminal connections and ends those shells; the saved command can still be reused when the listener is reopened. No server session or listener state survives a Worker restart.
+
+### Agent connection diagnostics
+
+Run the copied command again to fetch the current bootstrap. Already-running agents keep the code they originally downloaded. The agent prints its version and run ID to stderr, then waits for its terminal to attach before starting the shell.
+
+If a connection fails, keep the stderr lines, the time with timezone, and whether a terminal tab appeared. Retry messages identify the failed request, attempt, HTTP status or transport error type, and Cloudflare Ray ID when available. Do not share the copied command, agent token, or Authorization header.
+
+Protocol v2 never follows API redirects. It retries transient HTTP/transport failures with a bounded budget, deduplicates output after a lost HTTP acknowledgment, and retains browser input until Python acknowledges applying it. It respects rate-limit retry timing. Older agents retain the legacy protocol behavior.
+
+These guarantees apply while the same in-memory relay session remains alive. Browser disconnect, expiry, server state loss, and local PTY errors end the session. An HTTP output acknowledgment confirms acceptance by the relay; it does not prove the browser rendered the text. A transport disconnect alone cannot identify which network hop closed the connection.

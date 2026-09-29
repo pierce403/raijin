@@ -3,8 +3,8 @@ const MAX_RUNS = 100;
 const RUN_TTL_MS = 10 * 60_000;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,128}$/u;
 
-function json(payload, status = 200) {
-  return Response.json(payload, { status, headers: { "cache-control": "no-store" } });
+function json(payload, status = 200, headers = {}) {
+  return Response.json(payload, { status, headers: { "cache-control": "no-store", ...headers } });
 }
 
 async function hash(value) {
@@ -109,7 +109,11 @@ export class LauncherDurableObject {
     let run = this.runs.get(payload.runId);
     if (run && run.agentToken !== payload.agentToken) return json({ error: "Run already registered." }, 403);
     if (!run) {
-      if (this.runs.size >= MAX_RUNS) return json({ error: "Too many runs. Try again later." }, 429);
+      if (this.runs.size >= MAX_RUNS) {
+        const firstExpiry = Math.min(...Array.from(this.runs.values(), entry => entry.createdAt + RUN_TTL_MS));
+        const retryAfter = Math.max(1, Math.ceil((firstExpiry - Date.now()) / 1000));
+        return json({ error: "Too many runs. Try again later." }, 429, { "retry-after": String(retryAfter) });
+      }
       run = { runId: payload.runId, agentToken: payload.agentToken, createdAt: Date.now() };
       this.runs.set(run.runId, run);
     }

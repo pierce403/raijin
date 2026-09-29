@@ -106,7 +106,7 @@ function assertBrowserOrigin(request) {
   }
 }
 
-async function readRunBody(request) {
+async function readRunBody(request, limit = 1024) {
   const reader = request.body?.getReader();
   if (!reader) return "";
   const chunks = [];
@@ -115,9 +115,9 @@ async function readRunBody(request) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > 1024) {
+    if (size > limit) {
       await reader.cancel();
-      throw jsonResponse({ error: "Run details too large." }, { status: 413 });
+      throw jsonResponse({ error: "Request body too large." }, { status: 413 });
     }
     chunks.push(value);
   }
@@ -256,7 +256,9 @@ function parseBootstrapConfig(request) {
     command: typeof config.command === "string" ? config.command : "",
     readonly: Boolean(config.readonly),
     idleTimeoutSeconds: Number(config.idleTimeoutSeconds || 600),
-    maxLifetimeSeconds: Number.isFinite(Number(config.maxLifetimeSeconds))
+    maxLifetimeSeconds: config.maxLifetimeSeconds != null
+      && Number.isFinite(Number(config.maxLifetimeSeconds))
+      && Number(config.maxLifetimeSeconds) > 0
       ? Number(config.maxLifetimeSeconds)
       : null,
   };
@@ -293,7 +295,7 @@ async function handleAgentRequest(request, env, pathname) {
   }
 
   const headers = new Headers(request.headers);
-  const body = request.method === "GET" ? undefined : await request.text();
+  const body = request.method === "GET" ? undefined : await readRunBody(request, action === "out" ? 16384 : 4096);
 
   return forwardToSession(
     env,
@@ -331,11 +333,14 @@ function buildBootstrapScript(config) {
   const bootstrapConfig = JSON.stringify(JSON.stringify(config));
   return `#!/usr/bin/env python3
 import base64
+import email.utils
+import errno
 import fcntl
 import http.client
 import json
 import os
 import pty
+import re
 import select
 import secrets
 import sys
@@ -348,80 +353,193 @@ import urllib.request
 import termios
 
 CONFIG = json.loads(${bootstrapConfig})
-BASE_URL = CONFIG["baseUrl"]
+VERSION = "2026-09-29.1"
+BASE_URL = CONFIG["baseUrl"].rstrip("/")
 SESSION_ID = CONFIG["sessionId"]
 TOKEN = CONFIG["token"]
 MODE = CONFIG["mode"]
 COMMAND = CONFIG.get("command", "")
 READONLY = bool(CONFIG.get("readonly"))
-USER_AGENT = "raijin-agent/0.1 (+" + BASE_URL + ")"
 HEARTBEAT_INTERVAL = 15
 POLL_TIMEOUT = 30
+MAX_ATTEMPTS = 5
+REQUEST_BUDGET = 90
 RUNNING = True
 CHILD_PID = None
 MASTER_FD = None
+CHILD_EXIT_CODE = None
+SESSION_EPOCH = None
+INPUT_ACK = 0
+OUTPUT_SEQ = 1
+OUTCOME = None
+OUTCOME_LOCK = threading.Lock()
+STOP_EVENT = threading.Event()
 REQUEST_HEADERS = {
     "Authorization": "Bearer " + TOKEN,
     "Content-Type": "application/json",
-    "User-Agent": USER_AGENT,
+    "User-Agent": "raijin-agent/" + VERSION,
+    "X-Raijin-Protocol": "2",
 }
 
-def request_json(method, path, payload=None, timeout=POLL_TIMEOUT):
-    url = BASE_URL + path
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+# Keep proxy environment support, but never send credentials to a redirect target.
+HTTP = urllib.request.build_opener(NoRedirect())
+
+class RelayFailure(Exception):
+    def __init__(self, reason, exit_code, details=None):
+        super().__init__(reason)
+        self.reason = reason
+        self.exit_code = exit_code
+        self.details = details or {}
+
+def safe_field(value, limit=128):
+    return re.sub(r"[^A-Za-z0-9_./:-]", "_", str(value))[:limit]
+
+def diagnostic(event, **details):
+    fields = {"version": VERSION, "runId": safe_field(SESSION_ID), "event": event}
+    fields.update(details)
+    print("raijin: " + json.dumps(fields, separators=(",", ":")), file=sys.stderr, flush=True)
+
+def request_details(method, path, attempt, status=None, headers=None):
+    details = {"method": safe_field(method), "path": safe_field(path.split("?", 1)[0].split("#", 1)[0], 256),
+               "attempt": attempt, "maxAttempts": MAX_ATTEMPTS}
+    if status is not None:
+        details["status"] = status
+    ray = (headers or {}).get("CF-Ray", "")
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,80}", ray):
+        details["ray"] = ray
+    return details
+
+def retry_after(headers):
+    value = (headers or {}).get("Retry-After", "")
+    if not value:
+        return 0
+    try:
+        if value.strip().isdigit():
+            return int(value.strip())
+        date = email.utils.parsedate_to_datetime(value)
+        return max(0, date.timestamp() - time.time())
+    except (ValueError, TypeError, OverflowError):
+        return 0
+
+def terminal_http_failure(status, body, details):
+    if status in (401, 403):
+        return RelayFailure("authorization_rejected", 5, details)
+    if status == 410:
+        if body.get("code") == "session_reset":
+            return RelayFailure("session_reset", 4, details)
+        if body.get("code") in ("input_overflow", "too_many_polls"):
+            return RelayFailure(body["code"], 8, details)
+        if body.get("status") == "expired":
+            return RelayFailure("session_expired", 3, details)
+        if body.get("status") in ("ended", "disconnected"):
+            return RelayFailure("browser_closed", 0, details)
+        return RelayFailure("session_ended", 4, details)
+    return RelayFailure("http_rejected", 9, details)
+
+def request_json(method, path, payload=None, timeout=POLL_TIMEOUT, deadline=None, quiet=False):
+    deadline = min(deadline if deadline is not None else float("inf"), time.monotonic() + REQUEST_BUDGET)
     data = None if payload is None else json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, method=method, headers=REQUEST_HEADERS)
-    for attempt in range(3):
+    headers = dict(REQUEST_HEADERS)
+    if SESSION_EPOCH:
+        headers["X-Raijin-Epoch"] = SESSION_EPOCH
+    if path.endswith("/in"):
+        headers["X-Raijin-Input-Ack"] = str(INPUT_ACK)
+    req = urllib.request.Request(BASE_URL + path, data=data, method=method, headers=headers)
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        if not quiet and STOP_EVENT.is_set():
+            raise OUTCOME or RelayFailure("stopped", 0)
+        remaining = deadline - time.monotonic()
+        details = request_details(method, path, attempt)
+        if remaining <= 0:
+            raise RelayFailure("request_deadline", 6, details)
+        retry_delay = 0
+        reason = "transport_exhausted"
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                body = response.read()
-                if not body:
-                    return {}
-                return json.loads(body.decode("utf-8"))
+            with HTTP.open(req, timeout=min(timeout, remaining)) as response:
+                body = response.read(4 * 1024 * 1024 + 1)
+                details = request_details(method, path, attempt, response.status, response.headers)
+                if len(body) > 4 * 1024 * 1024:
+                    raise ValueError("response too large")
+                parsed = json.loads(body.decode("utf-8"))
+                if not isinstance(parsed, dict):
+                    raise ValueError("response is not an object")
+                if time.monotonic() >= deadline:
+                    raise RelayFailure("request_deadline", 6, details)
+                return parsed
         except urllib.error.HTTPError as error:
-            if error.code == 409:
-                error.close()
-                return {"retry": True}
-            retryable = 500 <= error.code < 600
             status = error.code
-            error.close()
-            if not retryable or attempt == 2:
-                raise RuntimeError(f"{method} {path} failed with {status}") from error
+            details = request_details(method, path, attempt, status, error.headers)
+            retry_delay = retry_after(error.headers)
+            error_body = {}
+            try:
+                parsed = json.loads(error.read(65536).decode("utf-8"))
+                if isinstance(parsed, dict):
+                    error_body = parsed
+            except (ValueError, OSError, http.client.HTTPException):
+                pass
+            finally:
+                error.close()
+            if status == 409 and not SESSION_EPOCH:
+                return {"retry": True}
+            retryable = status in (301, 302, 303, 307, 308, 409, 429) or 500 <= status < 600
+            if not retryable:
+                raise terminal_http_failure(status, error_body, details) from None
+            reason = "rate_limited" if status == 429 else "session_not_ready" if status == 409 else "http_exhausted"
         except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
-            if attempt == 2:
-                raise RuntimeError(f"{method} {path} failed after 3 attempts") from error
-        time.sleep(0.5 * (2 ** attempt))
+            details["errorType"] = safe_field(type(error).__name__)
+            reason = "transport_exhausted"
+        except (ValueError, UnicodeError):
+            reason = "invalid_response"
+        delay = max(retry_delay, 0.5 * (2 ** (attempt - 1)) + secrets.randbelow(101) / 1000)
+        if attempt == MAX_ATTEMPTS or time.monotonic() + delay >= deadline:
+            raise RelayFailure(reason, 6, details) from None
+        if not quiet and OUTCOME is None:
+            diagnostic("retry", reason=reason, delay=round(delay, 3), **details)
+        if quiet:
+            time.sleep(delay)
+        else:
+            STOP_EVENT.wait(delay)
 
 def register_run():
-    global SESSION_ID, TOKEN
-    if not CONFIG.get("reusable"):
-        return
-    run_id = secrets.token_urlsafe(24)
-    run_token = secrets.token_urlsafe(32)
-    deadline = time.monotonic() + 300
-    print("raijin: waiting for the listener and a new terminal tab...", file=sys.stderr)
+    global SESSION_ID, TOKEN, SESSION_EPOCH
+    started = time.monotonic()
+    deadline = started + 300
+    if CONFIG.get("reusable"):
+        SESSION_ID = secrets.token_urlsafe(24)
+        run_token = secrets.token_urlsafe(32)
+        diagnostic("waiting_for_listener")
+        while time.monotonic() < deadline:
+            result = request_json("POST", f"/api/launchers/{CONFIG['sessionId']}/runs",
+                                  {"runId": SESSION_ID, "agentToken": run_token}, timeout=10, deadline=deadline)
+            if not result.get("retry"):
+                break
+            time.sleep(min(1, max(0, deadline - time.monotonic())))
+        else:
+            raise RelayFailure("listener_timeout", 10, {"gate": "listener", "elapsed": round(time.monotonic() - started, 3)})
+        TOKEN = run_token
+        REQUEST_HEADERS["Authorization"] = "Bearer " + TOKEN
+    diagnostic("waiting_for_browser")
+    # Both reusable and older commands must negotiate before starting a shell.
     while time.monotonic() < deadline:
-        result = request_json("POST", f"/api/launchers/{CONFIG['sessionId']}/runs",
-                              {"runId": run_id, "agentToken": run_token}, timeout=10)
-        if not result.get("retry"):
-            break
-        time.sleep(1)
-    else:
-        raise RuntimeError("Open the command's listener page, then run the command again.")
-    SESSION_ID = run_id
-    TOKEN = run_token
-    REQUEST_HEADERS["Authorization"] = "Bearer " + TOKEN
-    # Do not start the shell until its own browser tab has initialized the relay.
-    while time.monotonic() < deadline:
-        result = request_json("POST", f"/agent/{SESSION_ID}/heartbeat", {}, timeout=10)
+        result = request_json("POST", f"/agent/{SESSION_ID}/heartbeat", {}, timeout=10, deadline=deadline)
         if result.get("browserConnected"):
-            print("raijin: terminal connected", file=sys.stderr)
+            epoch = result.get("epoch")
+            if result.get("protocol") != 2 or not isinstance(epoch, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", epoch):
+                raise RelayFailure("protocol_unavailable", 8)
+            SESSION_EPOCH = epoch
+            diagnostic("terminal_connected")
             return
-        time.sleep(1)
-    raise RuntimeError("Open the new session from the listener page, then run the command again.")
+        time.sleep(min(1, max(0, deadline - time.monotonic())))
+    raise RelayFailure("browser_timeout", 10, {"gate": "browser", "elapsed": round(time.monotonic() - started, 3)})
 
 def kill_child(graceful=True):
     global RUNNING
     RUNNING = False
+    STOP_EVENT.set()
     if not CHILD_PID:
         return
     try:
@@ -430,42 +548,83 @@ def kill_child(graceful=True):
         try:
             os.kill(CHILD_PID, signal.SIGTERM if graceful else signal.SIGKILL)
         except OSError:
+            pass
+
+def finish(failure):
+    global OUTCOME
+    with OUTCOME_LOCK:
+        if OUTCOME is not None:
             return
+        OUTCOME = failure
+        diagnostic("exit", reason=failure.reason, exitCode=failure.exit_code, **failure.details)
+    kill_child()
 
 def heartbeat_loop():
-    while RUNNING:
-        time.sleep(HEARTBEAT_INTERVAL)
+    while not STOP_EVENT.wait(HEARTBEAT_INTERVAL):
+        try:
+            request_json("POST", f"/agent/{SESSION_ID}/heartbeat", {})
+        except RelayFailure as error:
+            finish(error)
+            return
+        except Exception:
+            finish(RelayFailure("local_agent_failure", 7))
+            return
+
+def apply_events(events):
+    global INPUT_ACK
+    if not isinstance(events, list):
+        raise RelayFailure("invalid_input_sequence", 8)
+    for event in events:
         if not RUNNING:
             return
-        try:
-            payload = request_json("POST", f"/agent/{SESSION_ID}/heartbeat", {})
-            if payload.get("retry"):
-                continue
-        except Exception:
-            kill_child()
-            return
+        if not isinstance(event, dict):
+            raise RelayFailure("invalid_input_sequence", 8)
+        seq = event.get("seq")
+        if not isinstance(seq, int) or isinstance(seq, bool) or not (1 <= seq <= 9007199254740991):
+            raise RelayFailure("invalid_input_sequence", 8)
+        if seq <= INPUT_ACK:
+            continue
+        if seq != INPUT_ACK + 1:
+            raise RelayFailure("input_sequence_gap", 8)
+        if event.get("type") == "stdin":
+            if not READONLY:
+                data = event.get("data")
+                if not isinstance(data, str):
+                    raise RelayFailure("invalid_input_event", 8)
+                pending = memoryview(data.encode("utf-8"))
+                while pending:
+                    if not RUNNING:
+                        return
+                    try:
+                        written = os.write(MASTER_FD, pending)
+                    except InterruptedError:
+                        continue
+                    if written <= 0:
+                        raise OSError("PTY write made no progress")
+                    pending = pending[written:]
+        elif event.get("type") == "resize":
+            rows, cols = event.get("rows"), event.get("cols")
+            if not isinstance(rows, int) or not isinstance(cols, int) or not (1 <= rows <= 65535 and 1 <= cols <= 65535):
+                raise RelayFailure("invalid_resize", 8)
+            fcntl.ioctl(MASTER_FD, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+        else:
+            raise RelayFailure("invalid_input_event", 8)
+        # Advance only after the complete write or resize has been applied locally.
+        INPUT_ACK = seq
 
 def event_loop():
     while RUNNING:
         try:
             payload = request_json("GET", f"/agent/{SESSION_ID}/in", timeout=POLL_TIMEOUT)
-        except Exception:
-            kill_child()
-            return
-        if payload.get("retry"):
-            time.sleep(1)
-            continue
-        for event in payload.get("events", []):
-            if event.get("type") == "stdin" and not READONLY:
-                os.write(MASTER_FD, event.get("data", "").encode("utf-8", "ignore"))
-            elif event.get("type") == "resize":
-                rows = int(event.get("rows", 24))
-                cols = int(event.get("cols", 80))
-                packed = struct.pack("HHHH", rows, cols, 0, 0)
-                fcntl.ioctl(MASTER_FD, termios.TIOCSWINSZ, packed)
-            elif event.get("type") == "terminate":
-                kill_child()
+            if not RUNNING:
                 return
+            apply_events(payload.get("events", []))
+        except RelayFailure as error:
+            finish(error)
+            return
+        except Exception:
+            finish(RelayFailure("local_pty_failure", 7))
+            return
 
 def spawn_process():
     env = os.environ.copy()
@@ -482,49 +641,91 @@ def close_remote(reason, exit_code=None):
     if exit_code is not None:
         payload["exitCode"] = exit_code
     try:
-        request_json("POST", f"/agent/{SESSION_ID}/close", payload, timeout=5)
+        request_json("POST", f"/agent/{SESSION_ID}/close", payload, timeout=5,
+                     deadline=time.monotonic() + 5, quiet=True)
     except Exception:
         pass
 
-def read_and_forward():
-    exit_code = 0
-    try:
-        while RUNNING:
-            readable, _, _ = select.select([MASTER_FD], [], [], 0.25)
-            if MASTER_FD not in readable:
-                waited_pid, status = os.waitpid(CHILD_PID, os.WNOHANG)
-                if waited_pid == CHILD_PID:
-                    exit_code = os.waitstatus_to_exitcode(status)
-                    break
-                continue
-            try:
-                chunk = os.read(MASTER_FD, 4096)
-            except OSError:
-                break
-            if not chunk:
-                break
-            # Keep this chunk while the browser is initializing the session.
-            # Transport retries may replay output if only the ACK was lost.
-            while RUNNING:
-                payload = request_json(
-                    "POST",
-                    f"/agent/{SESSION_ID}/out",
-                    {"data": base64.b64encode(chunk).decode("ascii")},
-                    timeout=10,
-                )
-                if not payload.get("retry"):
-                    break
-                time.sleep(1)
-    finally:
-        close_remote("process exited", exit_code)
+def send_output(chunk):
+    global OUTPUT_SEQ
+    deadline = time.monotonic() + REQUEST_BUDGET
+    packet = {"seq": OUTPUT_SEQ, "data": base64.b64encode(chunk).decode("ascii")}
+    while RUNNING:
+        payload = request_json("POST", f"/agent/{SESSION_ID}/out", packet, timeout=10, deadline=deadline)
+        if payload.get("retry"):
+            if time.monotonic() + 1 >= deadline:
+                raise RelayFailure("session_not_ready", 6)
+            time.sleep(1)
+            continue
+        ack = payload.get("ack")
+        if not isinstance(ack, int) or isinstance(ack, bool) or ack < OUTPUT_SEQ:
+            raise RelayFailure("invalid_output_ack", 8)
+        OUTPUT_SEQ += 1
+        return
 
-try:
-    register_run()
-    CHILD_PID, MASTER_FD = spawn_process()
-    threading.Thread(target=heartbeat_loop, daemon=True).start()
-    threading.Thread(target=event_loop, daemon=True).start()
-    read_and_forward()
-finally:
-    kill_child(graceful=False)
+def child_exit(block=False):
+    global CHILD_EXIT_CODE
+    if CHILD_EXIT_CODE is not None or CHILD_PID is None:
+        return CHILD_EXIT_CODE
+    try:
+        waited_pid, status = os.waitpid(CHILD_PID, 0 if block else os.WNOHANG)
+    except ChildProcessError:
+        return CHILD_EXIT_CODE
+    if waited_pid == CHILD_PID:
+        CHILD_EXIT_CODE = os.waitstatus_to_exitcode(status)
+    return CHILD_EXIT_CODE
+
+def read_and_forward():
+    while RUNNING:
+        readable, _, _ = select.select([MASTER_FD], [], [], 0.25)
+        if MASTER_FD not in readable:
+            exit_code = child_exit()
+            if exit_code is not None:
+                return exit_code
+            continue
+        try:
+            chunk = os.read(MASTER_FD, 4096)
+        except OSError as error:
+            if error.errno != errno.EIO:
+                raise
+            chunk = b""
+        if not chunk:
+            # PTY EOF can precede waitpid readiness by a few milliseconds.
+            deadline = time.monotonic() + 0.5
+            while child_exit() is None and time.monotonic() < deadline:
+                time.sleep(0.01)
+            if CHILD_EXIT_CODE is None:
+                kill_child(graceful=False)
+                child_exit(block=True)
+            return CHILD_EXIT_CODE if CHILD_EXIT_CODE is not None else 7
+        send_output(chunk)
+    return 0
+
+def main():
+    global CHILD_PID, MASTER_FD
+    try:
+        register_run()
+        CHILD_PID, MASTER_FD = spawn_process()
+        threading.Thread(target=heartbeat_loop, daemon=True).start()
+        threading.Thread(target=event_loop, daemon=True).start()
+        exit_code = read_and_forward()
+        finish(RelayFailure("process_exited", exit_code if exit_code >= 0 else 128 - exit_code))
+    except RelayFailure as error:
+        finish(error)
+    except KeyboardInterrupt:
+        finish(RelayFailure("operator_interrupted", 130))
+    except Exception:
+        finish(RelayFailure("local_pty_failure", 7))
+    finally:
+        if SESSION_EPOCH and OUTCOME:
+            close_remote(OUTCOME.reason, OUTCOME.exit_code)
+        kill_child(graceful=False)
+        child_exit(block=True)
+        if MASTER_FD is not None:
+            os.close(MASTER_FD)
+    return OUTCOME.exit_code if OUTCOME else 7
+
+if __name__ == "__main__":
+    sys.exit(main())
 `;
 }

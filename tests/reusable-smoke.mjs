@@ -21,13 +21,18 @@ async function until(check, label, timeout = 15_000) {
   }
 }
 
-async function request(path, bearer, body = {}) {
+async function request(path, bearer, body = {}, headers = {}) {
   return fetch(`${base}${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(10_000),
   });
+}
+
+// Generated bootstraps pin v2 after readiness; probes must not downgrade them.
+function heartbeatV2(run) {
+  return request(`/agent/${run.runId}/heartbeat`, run.agentToken, {}, { "X-Raijin-Protocol": "2" });
 }
 
 async function socket(path, hello) {
@@ -161,14 +166,14 @@ try {
   assert.notEqual(firstRun.runId, secondRun.runId);
   assert.notEqual(firstRun.agentToken, secondRun.agentToken);
   for (const run of [firstRun, secondRun]) {
-    assert.equal((await request(`/agent/${run.runId}/heartbeat`, run.agentToken)).status, 409);
+    assert.equal((await heartbeatV2(run)).status, 409);
   }
   assert.equal(firstExecution.exited, false);
   assert.equal(secondExecution.exited, false);
   let first = await terminal(firstRun);
   await until(() => first.output.includes("raijin-reusable-ready"), "first PTY start");
   // The second bootstrap remains waiting until its own browser tab is attached.
-  assert.equal((await request(`/agent/${secondRun.runId}/heartbeat`, secondRun.agentToken)).status, 409);
+  assert.equal((await heartbeatV2(secondRun)).status, 409);
   const second = await terminal(secondRun);
   await until(() => second.output.includes("raijin-reusable-ready"), "second PTY start");
   assert.equal((await request(`/agent/${firstRun.runId}/out`, secondRun.agentToken, { data: "bm8=" })).status, 403);
@@ -178,13 +183,13 @@ try {
   const replaced = first;
   first = await terminal(firstRun, first.browserToken);
   await until(() => replaced.close, "replaced browser closes");
-  assert.equal((await request(`/agent/${firstRun.runId}/heartbeat`, firstRun.agentToken)).status, 200);
+  assert.equal((await heartbeatV2(firstRun)).status, 200);
   const unauthorized = await socket(`/connect/browser/${firstRun.runId}`, {
     type: "hello", browserToken: token(), agentTokenHash: hash(firstRun.agentToken),
   });
   await until(() => unauthorized.close, "unauthorized browser closes");
   assert.equal(unauthorized.close.code, 1008);
-  assert.equal((await request(`/agent/${firstRun.runId}/heartbeat`, firstRun.agentToken)).status, 200);
+  assert.equal((await heartbeatV2(firstRun)).status, 200);
   assert.equal(first.ws.readyState, WebSocket.OPEN);
 
   const firstLine = `first-${token()}`;
@@ -194,7 +199,7 @@ try {
   await until(() => first.close, "first session closes after its shell exits");
   assert.equal(second.output.includes(firstLine), false);
   assert.equal(second.ws.readyState, WebSocket.OPEN);
-  assert.equal((await request(`/agent/${secondRun.runId}/heartbeat`, secondRun.agentToken)).status, 200);
+  assert.equal((await heartbeatV2(secondRun)).status, 200);
   second.ws.send(JSON.stringify({ type: "stdin", data: `${secondLine}\n` }));
   await until(() => second.output.includes(`raijin-reusable-reply:${secondLine}`), "second isolated input/output");
   assert.equal(first.output.includes(secondLine), false);
@@ -215,7 +220,7 @@ try {
   assert.equal((await request(runPath, launcherToken, { runId: token(), agentToken: token() })).status, 409);
   console.log("Same generated bootstrap: reuse after exit and no-listener waiting passed");
 } finally {
-  await Promise.allSettled([...runs.values()].map(run => request(`/agent/${run.runId}/close`, run.agentToken)));
+  // Closing each attached browser ends its shell under either protocol.
   for (const ws of sockets) ws.close();
   await delay(100);
   for (const execution of processes) if (!execution.exited) execution.process.kill("SIGKILL");

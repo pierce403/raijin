@@ -3,6 +3,10 @@ const DEFAULT_IDLE_TIMEOUT_MS = 600_000;
 const MIN_TIMEOUT_MS = 60_000;
 const MAX_TIMEOUT_MS = 7_200_000;
 const MAX_SWEEP_INTERVAL_MS = 3_600_000;
+const MAX_INPUT_BYTES = 256 * 1024;
+const MAX_INPUT_EVENTS = 1024;
+const MAX_WAITERS = 16;
+const MAX_OUTPUT_BYTES = 64 * 1024;
 
 const encoder = new TextEncoder();
 
@@ -85,7 +89,13 @@ export class SessionDurableObject {
     this.waiters = [];
     this.status = "waiting_for_browser";
     this.endedAt = null;
+    this.endCode = null;
     this.expiryTimer = null;
+    this.epoch = null;
+    this.agentProtocol = null;
+    this.lastOutSeq = 0;
+    this.lastInputSeq = 0;
+    this.inputAck = 0;
   }
 
   async fetch(request) {
@@ -194,6 +204,11 @@ export class SessionDurableObject {
     this.agentIp = null;
     this.lastActivityAt = 0;
     this.pendingEvents = [];
+    this.epoch = null;
+    this.agentProtocol = null;
+    this.lastOutSeq = 0;
+    this.lastInputSeq = 0;
+    this.inputAck = 0;
   }
 
   async handleBrowserConnect(request) {
@@ -246,12 +261,12 @@ export class SessionDurableObject {
     }
 
     await this.checkExpiry();
-    if (this.endedAt) {
+    if (server !== this.browserSocket || !this.initialized || this.endedAt) {
       return;
     }
 
     if (payload.type === "stdin" && typeof payload.data === "string" && !this.readonly) {
-      this.queueEvent({ type: "stdin", data: payload.data });
+      if (!this.queueEvent({ type: "stdin", data: payload.data })) return;
       this.touchActivity();
       return;
     }
@@ -263,7 +278,7 @@ export class SessionDurableObject {
       && payload.cols > 0
       && payload.rows > 0
     ) {
-      this.queueEvent({ type: "resize", cols: payload.cols, rows: payload.rows });
+      if (!this.queueEvent({ type: "resize", cols: payload.cols, rows: payload.rows })) return;
       this.touchActivity();
       return;
     }
@@ -285,6 +300,11 @@ export class SessionDurableObject {
     }
 
     const browserTokenHash = await sha256Base64Url(payload.browserToken);
+    if (server.readyState !== 1) return;
+    if (this.endedAt) {
+      server.close(1000, "session ended");
+      return;
+    }
     if (this.browserTokenHash && this.browserTokenHash !== browserTokenHash) {
       server.close(1008, "invalid browser token");
       return;
@@ -317,6 +337,7 @@ export class SessionDurableObject {
 
     if (!this.initialized) {
       this.initialized = true;
+      this.epoch = crypto.randomUUID();
       this.agentTokenHash = payload.agentTokenHash;
       this.mode = ["interactive", "command", "readonly"].includes(payload.mode) ? payload.mode : "interactive";
       this.command = typeof payload.command === "string" ? payload.command : "";
@@ -331,7 +352,7 @@ export class SessionDurableObject {
     await this.checkExpiry();
     this.sendStatus(server);
 
-    if (!this.agentConnectedAt && !this.endedAt) {
+    if (!this.agentConnectedAt && !this.endedAt && server === this.browserSocket && server.readyState === 1) {
       server.send(JSON.stringify({ type: "notice", message: "Waiting for remote agent..." }));
     }
   }
@@ -371,24 +392,64 @@ export class SessionDurableObject {
   }
 
   async authenticateAgentRequest(request) {
-    if (this.endedAt) {
-      return { ok: false, response: jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 }) };
-    }
-
-    if (!this.initialized || !this.agentTokenHash) {
-      return { ok: false, response: jsonResponse({ error: "Browser has not initialized this session yet." }, { status: 409 }) };
-    }
-
     const token = readBearerToken(request);
     if (!token) {
       return { ok: false, response: jsonResponse({ error: "Missing agent token." }, { status: 401 }) };
     }
-
-    if ((await sha256Base64Url(token)) !== this.agentTokenHash) {
+    // An empty object cannot authenticate an old epoch. Reveal no prior session details.
+    if (!this.initialized || !this.agentTokenHash) {
+      if (this.endedAt) {
+        return { ok: false, response: this.sessionEndedResponse() };
+      }
+      return { ok: false, response: request.headers.has("x-raijin-epoch")
+        ? this.sessionResetResponse()
+        : jsonResponse({ error: "Browser has not initialized this session yet." }, { status: 409 }) };
+    }
+    const tokenHash = this.agentTokenHash;
+    const epoch = this.epoch;
+    if ((await sha256Base64Url(token)) !== tokenHash) {
       return { ok: false, response: jsonResponse({ error: "Unauthorized agent token." }, { status: 403 }) };
     }
+    const auth = { ok: true, tokenHash, epoch };
+    let error = this.agentStateError(auth);
+    if (error) return { ok: false, response: error };
+    await this.checkExpiry();
+    error = this.agentStateError(auth);
+    if (error) return { ok: false, response: error };
 
-    return { ok: true };
+    const header = request.headers.get("x-raijin-protocol");
+    const protocol = header === null ? 1 : header === "2" ? 2 : null;
+    if (!protocol || (this.agentProtocol !== null && protocol !== this.agentProtocol)) {
+      return { ok: false, response: jsonResponse({ error: "Agent protocol mismatch.", code: "protocol_mismatch" }, { status: 400 }) };
+    }
+    const requestedEpoch = request.headers.get("x-raijin-epoch");
+    if (requestedEpoch !== null && requestedEpoch !== this.epoch) {
+      return { ok: false, response: this.sessionResetResponse() };
+    }
+    if (protocol === 2 && requestedEpoch === null && new URL(request.url).pathname !== "/agent/heartbeat") {
+      return { ok: false, response: jsonResponse({ error: "Negotiate an epoch with a heartbeat first.", code: "missing_epoch" }, { status: 400 }) };
+    }
+    this.agentProtocol = protocol;
+    return { ...auth, protocol };
+  }
+
+  sessionResetResponse() {
+    return jsonResponse({ error: "Session state was reset. Start a new session.", code: "session_reset" }, { status: 410 });
+  }
+
+  sessionEndedResponse() {
+    return jsonResponse({ error: "Session is no longer active.", status: this.status,
+      ...(this.endCode ? { code: this.endCode } : {}) }, { status: 410 });
+  }
+
+  agentStateError(auth) {
+    if (this.endedAt) {
+      return this.sessionEndedResponse();
+    }
+    if (!this.initialized || this.epoch !== auth.epoch || this.agentTokenHash !== auth.tokenHash) {
+      return this.sessionResetResponse();
+    }
+    return null;
   }
 
   updateAgentIdentity(request) {
@@ -418,22 +479,39 @@ export class SessionDurableObject {
     if (!auth.ok) {
       return auth.response;
     }
+    const error = this.agentStateError(auth);
+    if (error) return error;
 
     this.markAgentConnected(request);
-    await this.checkExpiry();
+    if (auth.protocol === 2) {
+      const value = request.headers.get("x-raijin-input-ack") ?? "0";
+      const ack = Number(value);
+      if (!/^(0|[1-9]\d*)$/u.test(value) || !Number.isSafeInteger(ack) || ack > this.lastInputSeq) {
+        return jsonResponse({ error: "Invalid input acknowledgment.", code: "invalid_ack" }, { status: 422 });
+      }
+      if (ack > this.inputAck) {
+        this.inputAck = ack;
+        this.pendingEvents = this.pendingEvents.filter(event => event.seq === undefined || event.seq > ack);
+      }
+    }
 
     const immediate = this.flushEvents();
     if (immediate) {
       return jsonResponse(immediate);
     }
 
+    if (this.waiters.length >= MAX_WAITERS) {
+      await this.endSession("ended", { closeBrowser: true, code: "too_many_polls", message: "Too many pending input polls. Session ended." });
+      return this.sessionEndedResponse();
+    }
     return new Promise((resolve) => {
       const waiter = {
+        auth,
         resolve,
         timer: setTimeout(() => {
           this.waiters = this.waiters.filter((entry) => entry !== waiter);
           void this.checkExpiry().then(() => {
-            resolve(jsonResponse(this.flushEvents() || { events: [], status: this.currentStatus() }));
+            resolve(this.agentStateError(auth) || jsonResponse(this.flushEvents() || { events: [], status: this.currentStatus() }));
           });
         }, WAIT_TIMEOUT_MS),
       };
@@ -447,14 +525,37 @@ export class SessionDurableObject {
     if (!auth.ok) {
       return auth.response;
     }
+    const initialError = this.agentStateError(auth);
+    if (initialError) return initialError;
 
     this.markAgentConnected(request);
-    await this.checkExpiry();
-    if (this.endedAt) {
-      return jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 });
-    }
-
     const payload = await request.json().catch(() => ({}));
+    const error = this.agentStateError(auth);
+    if (error) return error;
+    if (auth.protocol === 2) {
+      if (!Number.isSafeInteger(payload?.seq) || payload.seq < 1 || typeof payload.data !== "string"
+        || payload.data.length > 4 * Math.ceil(MAX_OUTPUT_BYTES / 3)) {
+        return jsonResponse({ error: "Invalid output chunk.", code: "invalid_output" }, { status: 400 });
+      }
+      try {
+        const decoded = atob(payload.data);
+        if (decoded.length > MAX_OUTPUT_BYTES || btoa(decoded) !== payload.data) throw new Error("Invalid base64");
+      } catch {
+        return jsonResponse({ error: "Invalid output encoding.", code: "invalid_output" }, { status: 400 });
+      }
+      // No await between checking, forwarding, and advancing the accepted sequence.
+      if (payload.seq <= this.lastOutSeq) return jsonResponse({ ok: true, ack: this.lastOutSeq });
+      if (payload.seq !== this.lastOutSeq + 1) {
+        return jsonResponse({ error: "Output sequence gap.", code: "sequence_gap", expected: this.lastOutSeq + 1 }, { status: 422 });
+      }
+      if (!this.browserSocket || this.browserSocket.readyState !== 1) {
+        return jsonResponse({ error: "Waiting for the browser to attach." }, { status: 409 });
+      }
+      this.browserSocket.send(JSON.stringify({ type: "output", data: payload.data }));
+      this.lastOutSeq = payload.seq;
+      this.touchActivity();
+      return jsonResponse({ ok: true, ack: this.lastOutSeq });
+    }
     if (payload?.data && this.browserSocket && this.browserSocket.readyState === 1) {
       this.browserSocket.send(JSON.stringify({ type: "output", data: payload.data }));
     }
@@ -468,14 +569,12 @@ export class SessionDurableObject {
     if (!auth.ok) {
       return auth.response;
     }
+    const error = this.agentStateError(auth);
+    if (error) return error;
 
     this.markAgentConnected(request);
-    await this.checkExpiry();
-    if (this.endedAt) {
-      return jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 });
-    }
-
-    return jsonResponse({ ok: true, browserConnected: this.browserSocket?.readyState === 1 });
+    return jsonResponse({ ok: true, browserConnected: this.browserSocket?.readyState === 1,
+      ...(auth.protocol === 2 ? { protocol: 2, epoch: this.epoch } : {}) });
   }
 
   async handleAgentClose(request) {
@@ -485,6 +584,8 @@ export class SessionDurableObject {
     }
 
     const payload = await request.json().catch(() => ({}));
+    const error = this.agentStateError(auth);
+    if (error) return error;
     if (!this.endedAt) {
       await this.endSession("agent_closed", { closeBrowser: true, message: payload.reason });
     }
@@ -497,13 +598,13 @@ export class SessionDurableObject {
   }
 
   queueEvent(event) {
-    if (event.type === "resize") {
+    if (event.type === "resize" && this.agentProtocol === 1) {
       this.pendingEvents = this.pendingEvents.filter((entry) => entry.type !== "resize");
     }
 
     if (event.type === "stdin") {
       const lastEvent = this.pendingEvents.at(-1);
-      if (lastEvent?.type === "stdin") {
+      if (lastEvent?.type === "stdin" && lastEvent.seq === undefined) {
         lastEvent.data += event.data;
       } else {
         this.pendingEvents.push(event);
@@ -512,7 +613,14 @@ export class SessionDurableObject {
       this.pendingEvents.push(event);
     }
 
+    const bytes = this.pendingEvents.reduce((total, entry) => total + (entry.type === "stdin" ? encoder.encode(entry.data).byteLength : 16), 0);
+    if (this.pendingEvents.length > MAX_INPUT_EVENTS || bytes > MAX_INPUT_BYTES) {
+      void this.endSession("ended", { closeBrowser: true, code: "input_overflow", message: "Input buffer limit exceeded. Session ended." });
+      return false;
+    }
+
     this.flushWaiters();
+    return true;
   }
 
   flushEvents() {
@@ -527,6 +635,12 @@ export class SessionDurableObject {
       return null;
     }
 
+    if (this.agentProtocol === 2) {
+      for (const event of this.pendingEvents) {
+        if (event.seq === undefined) event.seq = ++this.lastInputSeq;
+      }
+      return { events: this.pendingEvents.map(event => ({ ...event })), status: this.currentStatus() };
+    }
     const events = this.pendingEvents;
     this.pendingEvents = [];
     return { events, status: this.currentStatus() };
@@ -544,7 +658,9 @@ export class SessionDurableObject {
 
     for (const waiter of this.waiters) {
       clearTimeout(waiter.timer);
-      waiter.resolve(jsonResponse(payload));
+      waiter.resolve(waiter.auth.protocol === 2 && this.endedAt
+        ? this.agentStateError(waiter.auth)
+        : jsonResponse(payload));
     }
     this.waiters = [];
   }
@@ -567,6 +683,7 @@ export class SessionDurableObject {
     }
 
     this.status = reason;
+    this.endCode = options.code || null;
     this.endedAt = Date.now();
     this.pendingEvents = [];
     this.flushWaiters();
