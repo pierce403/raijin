@@ -339,9 +339,9 @@ export class SessionDurableObject {
   async handleBrowserClose(server, helloTimer) {
     clearTimeout(helloTimer);
 
-    if (this.browserSocket === server) {
-      this.browserSocket = null;
-    }
+    // A replaced tab closing must not terminate the replacement's session.
+    if (this.browserSocket !== server) return;
+    this.browserSocket = null;
 
     if (!this.initialized || this.endedAt) {
       return;
@@ -475,7 +475,7 @@ export class SessionDurableObject {
       return jsonResponse({ error: "Session is no longer active.", status: this.status }, { status: 410 });
     }
 
-    return jsonResponse({ ok: true });
+    return jsonResponse({ ok: true, browserConnected: this.browserSocket?.readyState === 1 });
   }
 
   async handleAgentClose(request) {

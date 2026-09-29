@@ -1,7 +1,10 @@
 const STORAGE_PREFIX = "raijin:session:";
+const LAUNCHER_PREFIX = "raijin:launcher:";
+const LAUNCHER_RUNS_PREFIX = "raijin:launcher-runs:";
 const HISTORY_KEY = "raijin:session-history";
 const TRANSCRIPT_PREFIX = "raijin:session-log:";
 const MAX_HISTORY_ENTRIES = 200;
+export const MAX_LAUNCHER_RUNS = 200;
 const MAX_TRANSCRIPT_CHARS = 65_536;
 const ANSI_ESCAPE_PATTERN = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/gu;
 const CONTROL_CHAR_PATTERN = /[\u0000-\u0008\u000B-\u001F\u007F]/gu;
@@ -231,6 +234,47 @@ export function loadSession(sessionId) {
   return parseStoredJson(localStorage.getItem(sessionStorageKey(sessionId)));
 }
 
+export function saveLauncher(launcher) {
+  if (!safeSetItem(`${LAUNCHER_PREFIX}${launcher.sessionId}`, JSON.stringify(launcher))) {
+    throw new Error("Unable to save the command in this browser. Check available browser storage.");
+  }
+}
+
+export function loadLauncher(launcherId) {
+  return parseStoredJson(localStorage.getItem(`${LAUNCHER_PREFIX}${launcherId}`));
+}
+
+export function listLaunchers() {
+  const launchers = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(LAUNCHER_PREFIX)) {
+      continue;
+    }
+    const launcher = parseStoredJson(localStorage.getItem(key));
+    if (launcher?.reusable && typeof launcher.sessionId === "string") {
+      launchers.push(launcher);
+    }
+  }
+  return launchers
+    .sort((left, right) => (right.lastOpenedAt || right.createdAt) - (left.lastOpenedAt || left.createdAt))
+    .slice(0, 20);
+}
+
+export function loadLauncherRuns(launcherId) {
+  const records = parseStoredJson(localStorage.getItem(`${LAUNCHER_RUNS_PREFIX}${launcherId}`));
+  return Array.isArray(records)
+    ? records.filter((record) => record && typeof record.sessionId === "string"
+      && Number.isFinite(record.createdAt) && record.createdAt > 0).slice(-MAX_LAUNCHER_RUNS)
+    : [];
+}
+
+export function saveLauncherRuns(launcherId, runs) {
+  if (!safeSetItem(`${LAUNCHER_RUNS_PREFIX}${launcherId}`, JSON.stringify(runs.slice(-MAX_LAUNCHER_RUNS)))) {
+    throw new Error("Unable to save new runs in this browser. Check available browser storage.");
+  }
+}
+
 export function loadSessionTranscript(sessionId) {
   if (!sessionId) {
     return { tx: "", rx: "" };
@@ -385,6 +429,10 @@ export function buildSessionTranscriptText(session, transcript = null) {
 }
 
 export function buildBootstrapCommand(session, origin) {
+  const launcher = session.launcherId ? loadLauncher(session.launcherId) : null;
+  if (launcher?.reusable) {
+    session = launcher;
+  }
   const userAgent = `raijin-agent/0.1 (+${origin})`;
   const config = {
     baseUrl: origin,
@@ -395,6 +443,7 @@ export function buildBootstrapCommand(session, origin) {
     readonly: session.readonly,
     idleTimeoutSeconds: session.idleTimeoutSeconds,
     maxLifetimeSeconds: session.maxLifetimeSeconds,
+    ...(session.reusable ? { reusable: true } : {}),
   };
 
   const encodedConfig = encodeBase64Url(encoder.encode(JSON.stringify(config)));

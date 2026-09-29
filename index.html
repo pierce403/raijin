@@ -59,9 +59,8 @@
         </div>
         <h1>Open a shell.</h1>
         <p class="lede">
-          Start a temporary interactive session, paste a one-line Python bootstrap into
-          a system you control, and drop straight into a live browser
-          terminal.
+          Create a reusable Python command, paste it into a system you control,
+          and open a fresh browser terminal every time it runs.
         </p>
         <div class="warning-banner" role="alert">
           <strong>Warning:</strong> this grants remote shell access to the current
@@ -72,10 +71,19 @@
             New Session
           </button>
           <p class="helper-copy">
-            Interactive shell. 10 minute idle timeout.
+            Reusable command. Each shell has a 10 minute idle timeout.
           </p>
         </div>
         <p id="home-error" class="form-error" hidden></p>
+      </section>
+
+      <section id="launcher-history-panel" class="panel session-history-panel" hidden>
+        <div class="panel-header">
+          <p class="eyebrow">Saved In This Browser</p>
+          <h2>Recent Commands</h2>
+          <p class="lede compact">Reopen a listener to keep using its command. Your 20 most recent commands appear here.</p>
+        </div>
+        <div id="launcher-history-list" class="session-history-list"></div>
       </section>
 
       <section id="session-history-panel" class="panel session-history-panel" hidden>

@@ -14,7 +14,8 @@
       "/connect/*",
       "/agent/*",
       "/og-preview",
-      "/s/*"
+      "/s/*",
+      "/l/*"
     ]
   },
   "durable_objects": {
@@ -22,6 +23,10 @@
       {
         "name": "SESSIONS",
         "class_name": "SessionDurableObject"
+      },
+      {
+        "name": "LAUNCHERS",
+        "class_name": "LauncherDurableObject"
       }
     ]
   },
@@ -31,6 +36,10 @@
       "new_sqlite_classes": [
         "SessionDurableObject"
       ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["LauncherDurableObject"]
     }
   ]
 }

@@ -660,6 +660,11 @@ window.addEventListener("beforeunload", () => {
 async function init() {
   try {
     sessionInfo = loadSession(sessionId) || loadSessionFromFragment();
+    // The listener has already saved same-origin metadata before opening this tab.
+    // Strip transferred credentials even when that local record was found first.
+    if (sessionInfo && window.location.hash) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
     if (!sessionInfo) {
       throw new Error("Session metadata was not found for this origin.");
     }

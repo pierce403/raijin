@@ -10,6 +10,7 @@ export default defineConfig({
         home: resolve(__dirname, "index.html"),
         ogPreview: resolve(__dirname, "og-preview.html"),
         session: resolve(__dirname, "session.html"),
+        launcher: resolve(__dirname, "launcher.html"),
         notFound: resolve(__dirname, "404.html"),
       },
     },

@@ -32,7 +32,7 @@ Current architecture:
 - Cloudflare Worker serves static assets and request routing.
 - Durable Object holds only in-memory live session relay state.
 - Browser owns session metadata and stores it in `localStorage`.
-- Browser generates `sessionId`, `browserToken`, and `agentToken`.
+- Browser creates reusable listener credentials. Each Python execution generates a fresh session ID and agent token; the browser creates its independent browser token.
 - Remote side is a Python 3 stdlib-only bootstrap fetched from `GET /bootstrap?c=...`.
 
 ## Important Files
@@ -147,3 +147,17 @@ npm run build && npm run deploy
 - Production deployment verified on 2026-09-29: application commit `a991501`, Worker version `c175a3ff-cffb-42fc-803f-fe86949f8d15`. Public `https://raijin.sh/bootstrap` output matched the committed generator exactly; homepage returned 200; all three relay smoke cases passed, including the real Python PTY command.
 
 - Historical incident diagnostics: Cloudflare GraphQL `workersInvocationsAdaptive` and zone `httpRequestsAdaptiveGroups` were accessible with Wrangler OAuth even when Workers observability telemetry returned 403. Query `datetimeMinute`, path/method/`edgeResponseStatus`, and `avg.sampleInterval`; never equate invocation `success` with HTTP 2xx. Live `wrangler tail raijin --format json` emits JSON events without a readiness banner and worked when a probe generated traffic. Keep raw tails private because request headers and bootstrap URLs may contain tokens.
+
+## Reusable Commands (2026-09-29)
+
+- New Session creates a `/l/:id` listener, stored in `raijin:launcher:<id>`. `LAUNCHERS` binds `src/launcher-do.js`; migration `v2` adds its class. `/l/*` must be worker-first and `launcher.html` must be a Vite input.
+- Listener ID is SHA-256/base64url of its browser token. Verify that ownership proof even on an empty DO; possession of the copied agent command must not let a remote agent claim the listener after eviction.
+- Each Python execution generates its run ID and agent token once, retries the same registration at `/api/launchers/:id/runs`, and waits for `browserConnected: true` from its own session heartbeat before spawning a PTY. A bare heartbeat 200 can describe an initialized but detached browser; it is not sufficient readiness.
+- Registration is bounded to 100 runs per ten minutes in memory. Agent startup waits up to five minutes. Legacy commands without `reusable: true` keep their prior behavior.
+- Frontend saves child metadata before opening a named tab. Async popup blocking is expected: show per-run Open Session links and tell users to allow popups for automatic tabs. Do not use window.open's `noopener` feature to detect popup success because it returns null even when opening succeeds; clear the returned tab's opener instead.
+- Replayed run notifications and listener reloads must preserve child browser credentials and never reopen or resurrect ended sessions. Launcher run history uses a separate `raijin:launcher-runs:<id>` record. Saved listeners appear in Recent Commands.
+- A stale/replaced browser socket closing must return early in `SessionDurableObject.handleBrowserClose`; otherwise opening a replacement tab can terminate the current child session.
+- Strip session fragments even when localStorage already holds metadata, since listener tabs save metadata before navigating child tabs.
+- `node --test tests/bootstrap.test.mjs tests/launcher.test.mjs` checks bootstrap retries and frontend popup/replay handling. `node tests/reusable-smoke.mjs` against local Wrangler checks real concurrent PTYs, isolated I/O/auth, re-use after exit, readiness, and stale-socket closure. `tests/relay-smoke.mjs` checks legacy behavior. Public smoke uses `RAIJIN_TEST_URL=https://raijin.sh`.
+
+- Buffer the bounded registration body in the Worker before forwarding to the listener DO. Forwarding the live request stream triggered local workerd `Can't read from request stream after response has been sent` on early 409/403 responses. The registration body limit is 1024 bytes.

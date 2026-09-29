@@ -3,9 +3,11 @@ import {
   buildSessionTranscriptText,
   deleteLocalSessionRecord,
   encodeSessionFragment,
+  listLaunchers,
   listSessionHistory,
   randomToken,
-  saveSession,
+  saveLauncher,
+  sha256Base64Url,
 } from "./session-store.js";
 
 const errorNode = document.querySelector("#home-error");
@@ -15,6 +17,8 @@ const historyCountNode = document.querySelector("#session-history-count");
 const historySearchNode = document.querySelector("#session-search");
 const historyListNode = document.querySelector("#session-history-list");
 const historyEmptyNode = document.querySelector("#session-history-empty");
+const launcherHistoryPanel = document.querySelector("#launcher-history-panel");
+const launcherHistoryList = document.querySelector("#launcher-history-list");
 
 const DEFAULT_IDLE_TIMEOUT_SECONDS = 600;
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
@@ -214,6 +218,31 @@ function renderSessionHistory() {
   historyEmptyNode.hidden = visibleEntries.length > 0;
 }
 
+function renderLauncherHistory() {
+  const launchers = listLaunchers();
+  launcherHistoryPanel.hidden = launchers.length === 0;
+  document.body.classList.toggle("has-launcher-history", launchers.length > 0);
+  launcherHistoryList.replaceChildren(...launchers.map((launcher) => {
+    const card = document.createElement("article");
+    card.className = "session-history-card";
+    const header = document.createElement("div");
+    header.className = "session-history-card-header";
+    const title = document.createElement("code");
+    title.className = "launcher-history-id";
+    title.textContent = launcher.sessionId;
+    const link = document.createElement("a");
+    link.className = "secondary-button session-history-link";
+    link.href = `/l/${encodeURIComponent(launcher.sessionId)}`;
+    link.textContent = "Open Listener";
+    header.append(title, link);
+    const summary = document.createElement("p");
+    summary.className = "session-history-summary";
+    summary.textContent = `${buildSessionSummary(launcher)} · Created ${formatTimestamp(launcher.createdAt)}`;
+    card.append(header, summary);
+    return card;
+  }));
+}
+
 createButton.addEventListener("click", async () => {
   setError("");
 
@@ -221,9 +250,10 @@ createButton.addEventListener("click", async () => {
     createButton.disabled = true;
 
     const now = Date.now();
+    const browserToken = randomToken(32);
     const session = {
-      sessionId: randomToken(12),
-      browserToken: randomToken(32),
+      sessionId: await sha256Base64Url(browserToken),
+      browserToken,
       agentToken: randomToken(32),
       mode: "interactive",
       command: "",
@@ -231,11 +261,12 @@ createButton.addEventListener("click", async () => {
       createdAt: now,
       idleTimeoutSeconds: DEFAULT_IDLE_TIMEOUT_SECONDS,
       maxLifetimeSeconds: null,
+      reusable: true,
     };
 
-    saveSession(session);
+    saveLauncher(session);
     const fragment = encodeURIComponent(encodeSessionFragment(session));
-    window.location.assign(`/s/${encodeURIComponent(session.sessionId)}#s=${fragment}`);
+    window.location.assign(`/l/${encodeURIComponent(session.sessionId)}#s=${fragment}`);
   } catch (error) {
     setError(error instanceof Error ? error.message : "Unable to create session.");
     createButton.disabled = false;
@@ -247,3 +278,9 @@ historySearchNode.addEventListener("input", () => {
 });
 
 renderSessionHistory();
+renderLauncherHistory();
+
+window.addEventListener("pageshow", () => {
+  renderSessionHistory();
+  renderLauncherHistory();
+});

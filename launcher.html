@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>raijin.sh reusable command</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script type="module" src="/src/frontend/launcher.js"></script>
+  </head>
+  <body class="page page-launcher">
+    <main class="shell-layout launcher-layout">
+      <section class="hero-card launcher-command-panel">
+        <div class="hero-card-top">
+          <a class="eyebrow" href="/">raijin.sh</a>
+          <span id="launcher-status" class="status-badge status-waiting" role="status">connecting</span>
+        </div>
+        <h1>One command. New shells.</h1>
+        <p class="lede">
+          Run this command on a system you control. Each run creates a separate
+          session in a new tab, even when another session is already connected.
+        </p>
+        <label class="stack-field launcher-command-field" for="bootstrap-command">
+          <span>Reusable Python command</span>
+          <textarea id="bootstrap-command" class="command-output" readonly spellcheck="false"></textarea>
+        </label>
+        <div class="action-row">
+          <button id="copy-command" class="primary-button" type="button" disabled>Copy Command</button>
+          <p id="launcher-status-copy" class="helper-copy">Connecting the listener...</p>
+        </div>
+        <p class="lede compact">
+          Keep this listener tab open and allow popups for automatic session tabs.
+          If a tab is blocked, use Open Session below. The remote shell waits until
+          its session tab connects.
+        </p>
+        <p id="launcher-error" class="form-error" role="alert" hidden></p>
+      </section>
+      <section class="panel session-history-panel">
+        <div class="panel-header">
+          <p class="eyebrow">This Command</p>
+          <h2>Sessions</h2>
+        </div>
+        <div id="launcher-runs" class="session-history-list"></div>
+        <p id="launcher-empty" class="session-history-empty">Run the command to open your first session.</p>
+      </section>
+    </main>
+  </body>
+</html>

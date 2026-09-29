@@ -1,6 +1,7 @@
 import { SessionDurableObject } from "./session-do.js";
+import { LauncherDurableObject } from "./launcher-do.js";
 
-export { SessionDurableObject };
+export { SessionDurableObject, LauncherDurableObject };
 
 const DEFAULT_HEADERS = {
   "cache-control": "no-store",
@@ -105,6 +106,27 @@ function assertBrowserOrigin(request) {
   }
 }
 
+async function readRunBody(request) {
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > 1024) {
+      await reader.cancel();
+      throw jsonResponse({ error: "Run details too large." }, { status: 413 });
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  return bytes;
+}
+
 async function forwardToSession(env, sessionId, path, init) {
   const id = env.SESSIONS.idFromName(sessionId);
   const stub = env.SESSIONS.get(id);
@@ -128,6 +150,23 @@ async function handleRequest(request, env) {
 
   if (pathname.startsWith("/bootstrap") && request.method === "GET") {
     return handleBootstrap(request);
+  }
+
+  const listenerMatch = pathname.match(/^\/connect\/launcher\/([A-Za-z0-9_-]+)$/u);
+  const runMatch = pathname.match(/^\/api\/launchers\/([A-Za-z0-9_-]+)\/runs$/u);
+  if (listenerMatch && request.method === "GET") {
+    assertBrowserOrigin(request);
+    return env.LAUNCHERS.get(env.LAUNCHERS.idFromName(listenerMatch[1])).fetch(`https://launcher/connect?id=${listenerMatch[1]}`, {
+      method: "GET", headers: request.headers,
+    });
+  }
+  if (runMatch && request.method === "POST") {
+    return env.LAUNCHERS.get(env.LAUNCHERS.idFromName(runMatch[1])).fetch("https://launcher/runs", {
+      method: "POST", headers: request.headers, body: await readRunBody(request),
+    });
+  }
+  if (/^\/l\/[^/]+$/u.test(pathname)) {
+    return serveAssetHtml(env, request, "/launcher.html");
   }
 
   if (pathname.startsWith("/connect/browser/") && request.method === "GET") {
@@ -206,6 +245,7 @@ function parseBootstrapConfig(request) {
   }
 
   return {
+    reusable: config.reusable === true,
     baseUrl: config.baseUrl,
     sessionId: config.sessionId,
     token: config.token,
@@ -294,6 +334,8 @@ import json
 import os
 import pty
 import select
+import secrets
+import sys
 import signal
 import struct
 import threading
@@ -345,6 +387,34 @@ def request_json(method, path, payload=None, timeout=POLL_TIMEOUT):
             if attempt == 2:
                 raise RuntimeError(f"{method} {path} failed after 3 attempts") from error
         time.sleep(0.5 * (2 ** attempt))
+
+def register_run():
+    global SESSION_ID, TOKEN
+    if not CONFIG.get("reusable"):
+        return
+    run_id = secrets.token_urlsafe(24)
+    run_token = secrets.token_urlsafe(32)
+    deadline = time.monotonic() + 300
+    print("raijin: waiting for the listener and a new terminal tab...", file=sys.stderr)
+    while time.monotonic() < deadline:
+        result = request_json("POST", f"/api/launchers/{CONFIG['sessionId']}/runs",
+                              {"runId": run_id, "agentToken": run_token}, timeout=10)
+        if not result.get("retry"):
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError("Open the command's listener page, then run the command again.")
+    SESSION_ID = run_id
+    TOKEN = run_token
+    REQUEST_HEADERS["Authorization"] = "Bearer " + TOKEN
+    # Do not start the shell until its own browser tab has initialized the relay.
+    while time.monotonic() < deadline:
+        result = request_json("POST", f"/agent/{SESSION_ID}/heartbeat", {}, timeout=10)
+        if result.get("browserConnected"):
+            print("raijin: terminal connected", file=sys.stderr)
+            return
+        time.sleep(1)
+    raise RuntimeError("Open the new session from the listener page, then run the command again.")
 
 def kill_child(graceful=True):
     global RUNNING
@@ -446,6 +516,7 @@ def read_and_forward():
         close_remote("process exited", exit_code)
 
 try:
+    register_run()
     CHILD_PID, MASTER_FD = spawn_process()
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=event_loop, daemon=True).start()

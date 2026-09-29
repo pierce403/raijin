@@ -188,13 +188,51 @@ a {
   min-width: 180px;
 }
 
-.page-home.has-session-history .shell-layout {
+.page-home.has-session-history .shell-layout,
+.page-home.has-launcher-history .shell-layout {
   align-content: start;
+}
+
+.launcher-layout {
+  width: min(960px, calc(100vw - 32px));
+  align-content: start;
+}
+
+.launcher-command-panel {
+  display: grid;
+  gap: 20px;
+}
+
+.launcher-command-panel h1 {
+  white-space: normal;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+}
+
+.launcher-command-panel .lede {
+  margin: 0;
+}
+
+.launcher-command-field {
+  display: grid;
+  gap: 8px;
+}
+
+.launcher-history-id {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.launcher-history-id + .session-history-link {
+  flex-shrink: 0;
 }
 
 .session-history-panel {
   display: grid;
   gap: 18px;
+}
+
+.session-history-panel[hidden] {
+  display: none;
 }
 
 .session-history-header {
