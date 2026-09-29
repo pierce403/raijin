@@ -17,3 +17,9 @@ Verification:
 - Production attached/detached HTTP relay reproduction passed before the change
 
 A recurrence needs a correlated Cloudflare exception record and client request timing/response headers, including CF-Ray when available. The original proxy path was not available for reproduction here.
+
+## Deployment
+
+Deployed application commit `a991501` on 2026-09-29 using `npm run build && npm run deploy`. Cloudflare Worker version: `c175a3ff-cffb-42fc-803f-fe86949f8d15`.
+
+Post-deploy checks on https://raijin.sh passed: homepage HTTP 200, generated bootstrap byte-for-byte comparison against the committed generator, attached and detached relay cases, and the actual Python bootstrap executing a fixed printf command under a PTY. The original reported crash remains unconfirmed.

@@ -51,6 +51,7 @@ npm install
 npm run build
 npx wrangler dev --local --port 8787
 npx wrangler deploy --dry-run
+npm run build && npm run deploy
 ```
 
 ## Coding Conventions
@@ -142,3 +143,5 @@ npx wrangler deploy --dry-run
 - `RAIJIN_TEST_URL=https://raijin.sh node tests/relay-smoke.mjs` targets fresh production test sessions and closes them afterward. This is an explicit live test, not a read-only probe.
 - The reported first `/out` crash did not reproduce locally or on production with an initialized session and detached browser. A browser hello initializes server state; a never-initialized session returns 409. Detached output is ACKed and dropped. Closing a browser after the agent connects intentionally ends the session.
 - Bootstrap requests now make at most three attempts for transport errors and HTTP 5xx, with 0.5s/1s backoff. 401/403/410 are terminal; 409 retains its waiting contract. Output retries can duplicate text if the server delivered it but its ACK was lost. There is no exactly-once delivery or server persistence.
+
+- Production deployment verified on 2026-09-29: application commit `a991501`, Worker version `c175a3ff-cffb-42fc-803f-fe86949f8d15`. Public `https://raijin.sh/bootstrap` output matched the committed generator exactly; homepage returned 200; all three relay smoke cases passed, including the real Python PTY command.
