@@ -207,7 +207,11 @@ async function serveAssetHtml(env, request, assetPath) {
 
   const headers = new Headers(response.headers);
   const securityHeaders = htmlHeaders(assetPath === "/session.html" ? {
-    "content-security-policy": CSP_HEADER.replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
+    // xterm's DOM renderer generates style elements for its fixed-width grid
+    // and style attributes for ANSI colors. Allow both only on terminal pages.
+    "content-security-policy": CSP_HEADER
+      .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
+      .replace("frame-ancestors 'none'", "frame-ancestors 'self'"),
   } : {});
   for (const [key, value] of Object.entries(securityHeaders)) {
     headers.set(key, value);
