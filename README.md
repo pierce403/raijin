@@ -145,3 +145,7 @@ If a connection fails, keep the stderr lines, the time with timezone, and whethe
 Protocol v2 never follows API redirects. It retries transient HTTP/transport failures with a bounded budget, deduplicates output after a lost HTTP acknowledgment, and retains browser input until Python acknowledges applying it. It respects rate-limit retry timing. Older agents retain the legacy protocol behavior.
 
 These guarantees apply while the same in-memory relay session remains alive. Browser disconnect, expiry, server state loss, and local PTY errors end the session. An HTTP output acknowledgment confirms acceptance by the relay; it does not prove the browser rendered the text. A transport disconnect alone cannot identify which network hop closed the connection.
+
+## Licensing scope
+
+Original project code and documentation are licensed under the [Apache License, Version 2.0](LICENSE). Third-party dependencies, vendored code, quoted material, data, fonts, media, and other third-party assets retain their respective licenses and rights; this grant does not relicense them. Existing license notices and attribution must be preserved.
